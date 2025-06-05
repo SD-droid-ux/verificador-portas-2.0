@@ -58,7 +58,6 @@ if uploaded_file:
                     df_ctos = df_ctos.sort_values("ordem")
                     df_ctos = df_ctos.drop(columns=["ordem"])
 
-
                     def obter_status(row):
                         total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
                         if total > 128:
@@ -70,52 +69,51 @@ if uploaded_file:
                         else:
                             return "✅ OK"
 
-
                     df_ctos["STATUS"] = df_ctos.apply(obter_status, axis=1)
                     st.dataframe(df_ctos)
 
                 progress_bar.empty()
-                
+
         elif aba == "3. CTOs Próximas":
-    st.subheader("📍 CTOs Próximas de CTOs Saturadas")
-    input_ctos_saturadas = st.text_area("Insira os nomes das CTOs Saturadas (uma por linha)").splitlines()
+            st.subheader("📍 CTOs Próximas de CTOs Saturadas")
+            input_ctos_saturadas = st.text_area("Insira os nomes das CTOs Saturadas (uma por linha)").splitlines()
 
-    if st.button("🔍 Buscar CTOs próximas"):
-        with st.spinner("🔄 Processando..."):
-            df_saturadas = df[df["NOME ANTIGO CTO"].isin(input_ctos_saturadas)]
-            df_ok = df[(df["PORTAS"] == 8)]
+            if st.button("🔍 Buscar CTOs próximas"):
+                with st.spinner("🔄 Processando..."):
+                    df_saturadas = df[df["NOME ANTIGO CTO"].isin(input_ctos_saturadas)]
+                    df_ok = df[(df["PORTAS"] == 8)]
 
-            # Precisamos da função geopy
-            from geopy.distance import geodesic
+                    # Precisamos da função geopy
+                    from geopy.distance import geodesic
 
-            resultados = []
+                    resultados = []
 
-            for _, cto_sat in df_saturadas.iterrows():
-                coord_sat = (cto_sat["LAT"], cto_sat["LONG"])
-                for _, cto_ok in df_ok.iterrows():
-                    coord_ok = (cto_ok["LAT"], cto_ok["LONG"])
-                    distancia = geodesic(coord_sat, coord_ok).meters
+                    for _, cto_sat in df_saturadas.iterrows():
+                        coord_sat = (cto_sat["LAT"], cto_sat["LONG"])
+                        for _, cto_ok in df_ok.iterrows():
+                            coord_ok = (cto_ok["LAT"], cto_ok["LONG"])
+                            distancia = geodesic(coord_sat, coord_ok).meters
 
-                    total_portas_ok = portas_por_caminho.get(cto_ok["CAMINHO_REDE"], 0)
-                    status_ok = "✅ OK" if total_portas_ok < 128 else "🔴 Saturado"
+                            total_portas_ok = portas_por_caminho.get(cto_ok["CAMINHO_REDE"], 0)
+                            status_ok = "✅ OK" if total_portas_ok < 128 else "🔴 Saturado"
 
-                    if distancia <= 500 and status_ok == "✅ OK":
-                        resultados.append({
-                            "CTO Saturada": cto_sat["NOME ANTIGO CTO"],
-                            "CTO OK": cto_ok["NOME ANTIGO CTO"],
-                            "Distância (m)": round(distancia, 2),
-                            "Raio": "100m" if distancia <= 100 else ("300m" if distancia <= 300 else "500m"),
-                            "CAMINHO_REDE": cto_ok["CAMINHO_REDE"],
-                            "LAT": cto_ok["LAT"],
-                            "LONG": cto_ok["LONG"]
-                        })
+                            if distancia <= 500 and status_ok == "✅ OK":
+                                resultados.append({
+                                    "CTO Saturada": cto_sat["NOME ANTIGO CTO"],
+                                    "CTO OK": cto_ok["NOME ANTIGO CTO"],
+                                    "Distância (m)": round(distancia, 2),
+                                    "Raio": "100m" if distancia <= 100 else ("300m" if distancia <= 300 else "500m"),
+                                    "CAMINHO_REDE": cto_ok["CAMINHO_REDE"],
+                                    "LAT": cto_ok["LAT"],
+                                    "LONG": cto_ok["LONG"]
+                                })
 
-            if resultados:
-                resultado_df = pd.DataFrame(resultados)
-                st.map(resultado_df[["LAT", "LONG"]])
-                st.dataframe(resultado_df)
-            else:
-                st.warning("❌ Nenhuma CTO próxima com 8 portas e status OK encontrada.")
+                    if resultados:
+                        resultado_df = pd.DataFrame(resultados)
+                        st.map(resultado_df[["LAT", "LONG"]])
+                        st.dataframe(resultado_df)
+                    else:
+                        st.warning("❌ Nenhuma CTO próxima com 8 portas e status OK encontrada.")
 
 else:
     st.info("📥 Aguarde o envio de um arquivo para iniciar a análise.")
