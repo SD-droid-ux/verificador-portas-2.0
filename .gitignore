@@ -1,0 +1,17 @@
+# Ignora arquivos e pastas do Python
+__pycache__/
+*.py[cod]
+
+# Ignora ambientes virtuais
+env/
+.venv/
+
+# Ignora arquivos de dados como planilhas Excel
+*.xlsx
+
+# Ignora variáveis de ambiente (caso use .env para senhas ou configurações)
+.env
+
+# Ignora arquivos do sistema (Windows / macOS)
+Thumbs.db
+.DS_Store
