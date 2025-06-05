@@ -85,6 +85,16 @@ if uploaded_file:
 
                     # Precisamos da função geopy
                     from geopy.distance import geodesic
+                    
+                    # Converter para numérico (transforma strings inválidas em NaN)
+                    df_saturadas["LAT"] = pd.to_numeric(df_saturadas["LAT"], errors="coerce")
+                    df_saturadas["LONG"] = pd.to_numeric(df_saturadas["LONG"], errors="coerce")
+                    df_ok["LAT"] = pd.to_numeric(df_ok["LAT"], errors="coerce")
+                    df_ok["LONG"] = pd.to_numeric(df_ok["LONG"], errors="coerce")
+
+                    # Remover linhas com coordenadas ausentes ou inválidas
+                    df_saturadas = df_saturadas.dropna(subset=["LAT", "LONG"])
+                    df_ok = df_ok.dropna(subset=["LAT", "LONG"])
 
                     resultados = []
 
