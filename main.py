@@ -35,7 +35,7 @@ if uploaded_file:
                 total_portas = df["PORTAS"].sum()
 
                 caminho_rede_grupo = pd.DataFrame(list(portas_por_caminho.items()), columns=["CAMINHO_REDE", "PORTAS"])
-                saturados = caminho_rede_grupo[caminho_rede_grupo["PORTAS"] > 128]
+                saturados = caminho_rede_grupo[caminho_rede_grupo["PORTAS"] => 128]
 
             progress_bar.empty()
 
