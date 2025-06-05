@@ -22,7 +22,7 @@ if uploaded_file:
         # Pré-calcular soma de portas por caminho de rede
         portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
 
-        aba = st.sidebar.radio("Selecione a aba", ["1. Visão Geral", "2. Buscar por CTO"])
+        aba = st.sidebar.radio("Selecione a aba", ["1. Visão Geral", "2. Buscar por CTO", "3. CTOs Próximas"])
 
         if aba == "1. Visão Geral":
             with st.spinner("🔄 Carregando visão geral..."):
