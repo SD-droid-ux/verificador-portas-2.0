@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from pages import buscar_cto, ctos_proximas
+from pages import Buscar por CTO, Cto Proxima
 
 st.title("📊 Verificador de Portas")
 
