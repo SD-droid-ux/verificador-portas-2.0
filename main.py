@@ -44,7 +44,7 @@ if uploaded_file:
             st.metric("🔴 Caminhos Saturados", len(saturados))
 
         elif aba == "2. Buscar por CTO":
-            input_ctos = st.text_area("Insira os ID das CTOs (uma por linha)").splitlines()
+            input_ctos = list(dict.fromkeys(st.text_area("Insira os ID das CTOs (uma por linha)").splitlines()))
 
             if st.button("🔍 Buscar CTOs"):
                 with st.spinner("🔄 Analisando CTOs..."):
