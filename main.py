@@ -10,18 +10,23 @@ uploaded_file = st.file_uploader("📂 Envie a planilha Excel", type=[".xlsx"])
 
 if uploaded_file:
     df = pd.read_excel(uploaded_file, engine="openpyxl")
-    df = df.loc[:, ~df.columns.duplicated()]  # Remove colunas duplicadas
+    df = df.loc[:, ~df.columns.duplicated()]
 
     colunas_essenciais = ["POP", "CHASSI", "PLACA", "OLT", "PORTAS", "ID CTO", "CIDADE", "NOME ANTIGO CTO"]
     if not all(col in df.columns for col in colunas_essenciais):
         st.error("❌ Colunas essenciais ausentes na planilha. Verifique se possui: " + ", ".join(colunas_essenciais))
     else:
-        # Armazena a base no session_state
-        st.session_state["df_base"] = df
-
+        # Criar CAMINHO_REDE
         df["CAMINHO_REDE"] = df["POP"].astype(str) + " / " + df["CHASSI"].astype(str) + " / " + df["PLACA"].astype(str) + " / " + df["OLT"].astype(str)
+        
+        # Pré-calcular soma de portas por caminho de rede
         portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
 
+        # ✅ Salva no session_state
+        st.session_state["df"] = df
+        st.session_state["portas_por_caminho"] = portas_por_caminho
+
+        # Exibe Visão Geral
         with st.spinner("🔄 Carregando visão geral..."):
             progress_bar = st.progress(0)
             for i in range(5):
@@ -30,6 +35,7 @@ if uploaded_file:
 
             total_ctos = len(df)
             total_portas = df["PORTAS"].sum()
+
             caminho_rede_grupo = pd.DataFrame(list(portas_por_caminho.items()), columns=["CAMINHO_REDE", "PORTAS"])
             saturados = caminho_rede_grupo[caminho_rede_grupo["PORTAS"] > 128]
 
@@ -38,5 +44,3 @@ if uploaded_file:
         st.metric("🔢 Total de CTOs", total_ctos)
         st.metric("🔌 Total de Portas", total_portas)
         st.metric("🔴 Caminhos Saturados", len(saturados))
-else:
-    st.warning("📎 Envie uma planilha para continuar.")
