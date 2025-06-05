@@ -74,60 +74,6 @@ if uploaded_file:
 
                 progress_bar.empty()
 
-        elif aba == "3. CTOs Próximas":
-            st.subheader("📍 CTOs Próximas de CTOs Saturadas")
-            input_ctos_saturadas = st.text_area("Insira os nomes das CTOs Saturadas (uma por linha)").splitlines()
-
-            if st.button("🔍 Buscar CTOs próximas"):
-                with st.spinner("🔄 Processando..."):
-                    df_saturadas = df[df["NOME ANTIGO CTO"].isin(input_ctos_saturadas)]
-                    df_ok = df[(df["PORTAS"] == 8)]
-
-                    # Precisamos da função geopy
-                    from geopy.distance import geodesic
-                    
-                    # Converter coordenadas para numérico
-                    df_saturadas["LAT"] = pd.to_numeric(df_saturadas["LAT"], errors="coerce")
-                    df_saturadas["LONG"] = pd.to_numeric(df_saturadas["LONG"], errors="coerce")
-                    df_ok["LAT"] = pd.to_numeric(df_ok["LAT"], errors="coerce")
-                    df_ok["LONG"] = pd.to_numeric(df_ok["LONG"], errors="coerce")
-
-                    # Remover coordenadas ausentes ou fora do intervalo geográfico válido
-                    df_saturadas = df_saturadas[
-                    df_saturadas["LAT"].between(-90, 90) & df_saturadas["LONG"].between(-180, 180)
-                    ]
-                    df_ok = df_ok[
-                    df_ok["LAT"].between(-90, 90) & df_ok["LONG"].between(-180, 180)
-                    ]
-
-                    resultados = []
-
-                    for _, cto_sat in df_saturadas.iterrows():
-                        coord_sat = (cto_sat["LAT"], cto_sat["LONG"])
-                        for _, cto_ok in df_ok.iterrows():
-                            coord_ok = (cto_ok["LAT"], cto_ok["LONG"])
-                            distancia = geodesic(coord_sat, coord_ok).meters
-
-                            total_portas_ok = portas_por_caminho.get(cto_ok["CAMINHO_REDE"], 0)
-                            status_ok = "✅ OK" if total_portas_ok < 128 else "🔴 Saturado"
-
-                            if distancia <= 500 and status_ok == "✅ OK":
-                                resultados.append({
-                                    "CTO Saturada": cto_sat["NOME ANTIGO CTO"],
-                                    "CTO OK": cto_ok["NOME ANTIGO CTO"],
-                                    "Distância (m)": round(distancia, 2),
-                                    "Raio": "100m" if distancia <= 100 else ("300m" if distancia <= 300 else "500m"),
-                                    "CAMINHO_REDE": cto_ok["CAMINHO_REDE"],
-                                    "LAT": cto_ok["LAT"],
-                                    "LONG": cto_ok["LONG"]
-                                })
-
-                    if resultados:
-                        resultado_df = pd.DataFrame(resultados)
-                        st.map(resultado_df[["LAT", "LONG"]])
-                        st.dataframe(resultado_df)
-                    else:
-                        st.warning("❌ Nenhuma CTO próxima com 8 portas e status OK encontrada.")
 
 else:
     st.info("📥 Aguarde o envio de um arquivo para iniciar a análise.")
