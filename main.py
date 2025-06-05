@@ -59,16 +59,14 @@ if uploaded_file:
                     df_ctos = df_ctos.drop(columns=["ordem"])
 
 
-                    def obter_status(row):
-    total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
-    if total > 128:
-        return "🔴 Saturado"
-    elif total == 128:
-        return "🟡 Caminho de Rede já é 128"
-    elif row["PORTAS"] == 16:
-        return "⚠️ 16 portas (fora padrão)"
-    else:
-        return "✅ OK"
+                     def obter_status(row):
+                        total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
+                        if total > 128:
+                            return "🔴 Saturado"
+                        elif row["PORTAS"] == 16:
+                            return "⚠️ 16 portas (fora padrão)"
+                        else:
+                            return "✅ OK"
 
 
                     df_ctos["STATUS"] = df_ctos.apply(obter_status, axis=1)
