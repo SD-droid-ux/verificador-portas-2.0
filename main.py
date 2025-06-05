@@ -53,7 +53,11 @@ if uploaded_file:
                         time.sleep(0.1)
                         progress_bar.progress((i + 1) * 20)
 
-                    df_ctos = df[df["NOME ANTIGO CTO"].isin(input_ctos)].copy()
+                    df_ctos = df[df["NOME ANTIGO CTO"].isin(input_ctos)]
+                    df_ctos["ordem"] = pd.Categorical(df_ctos["NOME ANTIGO CTO"], categories=input_ctos, ordered=True)
+                    df_ctos = df_ctos.sort_values("ordem")
+                    df_ctos = df_ctos.drop(columns=["ordem"])
+
 
                     def obter_status(row):
                         total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
