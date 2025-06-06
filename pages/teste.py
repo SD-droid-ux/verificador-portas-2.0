@@ -1,74 +1,69 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-from math import radians, sin, cos, sqrt, atan2
+from geopy.distance import geodesic
 
-st.title("📍 CTOs Próximas com 8 Portas e PON Disponível")
+st.set_page_config(page_title="CTOs Próximas e Disponíveis", layout="wide")
 
-# Carrega a base de dados do repositório local
 @st.cache_data
 def carregar_dados():
-    return pd.read_excel("pages/base_de_dados/base.xlsx")
+    df = pd.read_excel("base_de_dados/base.xlsx")
+
+    # Criar coluna CAMINHO_REDE com base em POP, CHASSI, PLACA, OLT
+    df["CAMINHO_REDE"] = (
+        df["POP"].astype(str) + "_" +
+        df["CHASSI"].astype(str) + "_" +
+        df["PLACA"].astype(str) + "_" +
+        df["OLT"].astype(str)
+    )
+
+    # Garantir que LAT/LONG sejam float
+    df["LAT"] = df["LAT"].astype(float)
+    df["LONG"] = df["LONG"].astype(float)
+
+    return df
 
 df = carregar_dados()
 
-# Função para calcular a distância (em metros) entre duas coordenadas geográficas
-def calcular_distancia(lat1, lon1, lat2, lon2):
-    R = 6371000  # raio da Terra em metros
-    phi1, phi2 = radians(lat1), radians(lat2)
-    dphi = radians(lat2 - lat1)
-    dlambda = radians(lon2 - lon1)
+st.title("📍 Buscar CTOs Próximas e Disponíveis")
 
-    a = sin(dphi/2)**2 + cos(phi1) * cos(phi2) * sin(dlambda/2)**2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+# Entrada da lista de CTOs que NÃO podem ser trocadas
+cto_invalidas = st.text_area("Insira os nomes das CTOs que **NÃO podem ser trocadas** (uma por linha):")
 
-    return R * c
-
-# Cálculo de total de portas por caminho de rede
-df["CAMINHO_REDE"] = df["CAMINHO_REDE"].astype(str)
-portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
-
-# Entrada da lista de CTOs NÃO trocáveis
-cto_nao_trocaveis = st.text_area("Cole aqui os nomes das CTOs **NÃO trocáveis** (uma por linha)").upper().splitlines()
-cto_nao_trocaveis = [cto.strip() for cto in cto_nao_trocaveis if cto.strip()]
-
-if st.button("🔍 Buscar CTOs Próximas com 8 Portas Disponíveis"):
-    if not cto_nao_trocaveis:
-        st.warning("⚠️ Por favor, insira pelo menos uma CTO.")
+if st.button("🔍 Buscar CTOs Disponíveis em até 250m"):
+    if not cto_invalidas.strip():
+        st.warning("⚠️ Por favor, insira ao menos uma CTO inválida.")
     else:
-        df_nao_trocaveis = df[df["NOME ANTIGO CTO"].isin(cto_nao_trocaveis)]
-        resultados = []
+        lista_ctos_invalidas = [cto.strip().upper() for cto in cto_invalidas.splitlines() if cto.strip()]
+        df["NOME ANTIGO CTO"] = df["NOME ANTIGO CTO"].astype(str).str.upper()
 
-        for _, linha_cto in df_nao_trocaveis.iterrows():
-            lat1, lon1 = linha_cto["LAT"], linha_cto["LONG"]
+        # Criar dicionário com total de portas por caminho
+        portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
 
-            if pd.isna(lat1) or pd.isna(lon1):
-                continue
+        # CTOs inválidas (de entrada)
+        df_invalidas = df[df["NOME ANTIGO CTO"].isin(lista_ctos_invalidas)].copy()
 
-            # CTOs com 8 portas e caminho com total < 128
-            ctos_validas = df[
-                (df["PORTAS"] == 8) &
-                (df["CAMINHO_REDE"].map(portas_por_caminho) < 128) &
-                (df["NOME ANTIGO CTO"] != linha_cto["NOME ANTIGO CTO"])
-            ]
+        # CTOs candidatas (8 portas e caminho com < 128 portas)
+        df_candidatas = df[(df["PORTAS"] == 8)].copy()
+        df_candidatas["TOTAL_PORTAS_CAMINHO"] = df_candidatas["CAMINHO_REDE"].map(portas_por_caminho)
+        df_candidatas = df_candidatas[df_candidatas["TOTAL_PORTAS_CAMINHO"] < 128]
 
-            for _, linha_valid in ctos_validas.iterrows():
-                lat2, lon2 = linha_valid["LAT"], linha_valid["LONG"]
-                if pd.isna(lat2) or pd.isna(lon2):
-                    continue
+        # Lista para armazenar CTOs próximas
+        proximas = []
 
-                distancia = calcular_distancia(lat1, lon1, lat2, lon2)
+        for _, row_inv in df_invalidas.iterrows():
+            lat_inv, long_inv = row_inv["LAT"], row_inv["LONG"]
+            for _, row_cand in df_candidatas.iterrows():
+                lat_cand, long_cand = row_cand["LAT"], row_cand["LONG"]
+                distancia = geodesic((lat_inv, long_inv), (lat_cand, long_cand)).meters
                 if distancia <= 250:
-                    resultados.append({
-                        "CTO BASE": linha_cto["NOME ANTIGO CTO"],
-                        "CTO PRÓXIMA": linha_valid["NOME ANTIGO CTO"],
-                        "CAMINHO_REDE PRÓXIMO": linha_valid["CAMINHO_REDE"],
-                        "PORTAS NO CAMINHO": portas_por_caminho[linha_valid["CAMINHO_REDE"]],
-                        "DISTÂNCIA (m)": round(distancia, 2)
-                    })
+                    proximas.append(row_cand)
 
-        if resultados:
-            st.success(f"✅ {len(resultados)} CTO(s) próximas encontradas.")
-            st.dataframe(pd.DataFrame(resultados))
+        if proximas:
+            df_resultado = pd.DataFrame(proximas).drop_duplicates(subset=["NOME ANTIGO CTO"])
+            st.success(f"✅ Foram encontradas {len(df_resultado)} CTOs disponíveis a até 250m das CTOs inválidas.")
+            cidade_filtro = st.selectbox("Filtrar por cidade (opcional):", options=["Todas"] + sorted(df_resultado["CIDADE"].unique().tolist()))
+            if cidade_filtro != "Todas":
+                df_resultado = df_resultado[df_resultado["CIDADE"] == cidade_filtro]
+            st.dataframe(df_resultado)
         else:
-            st.info("🔎 Nenhuma CTO próxima com as condições encontradas.")
+            st.info("Nenhuma CTO com 8 portas e caminho < 128 encontrada a até 250m das CTOs inválidas.")
