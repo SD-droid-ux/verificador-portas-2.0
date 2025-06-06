@@ -1,116 +1,51 @@
 import streamlit as st
 import pandas as pd
-import folium
-from streamlit_folium import st_folium
 
-st.set_page_config(page_title="CTOs Próximas", layout="wide")
+st.title("🔍 Análise de CTOs utilizáveis e não utilizáveis")
 
-st.title("📍 Buscar CTOs Próximas")
-
-# Verifica se os dados estão disponíveis
+# Verifica se os dados foram carregados no main.py
 if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
-    st.warning("⚠️ A base de dados ainda não foi carregada. Volte à página inicial e envie um arquivo Excel.")
+    st.error("❌ Dados não encontrados. Faça o upload da base no menu principal.")
     st.stop()
 
+# Carrega os dados do session_state
 df = st.session_state.df.copy()
-portas_por_caminho = st.session_state.portas_por_caminho
+portas_por_caminho = st.session_state.portas_por_caminho.copy()
 
-# Função para definir o STATUS de cada linha
-def obter_status(row):
-    total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
-    if total > 128:
-        return "🔴 SATURADO"
-    elif total == 128 and row["PORTAS"] == 16:
-        return "🔴 SATURADO"
-    elif total == 128 and row["PORTAS"] == 8:
-        return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
-    elif row["PORTAS"] == 16 and total < 128:
-        return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
-    elif row["PORTAS"] == 8 and total < 128:
-        return "✅ TROCA DE SP8 PARA SP16"
+# Filtro por cidade
+cidades_disponiveis = sorted(df["CIDADE"].dropna().unique())
+cidade_selecionada = st.selectbox("Selecione a cidade:", cidades_disponiveis)
+
+df_filtrado = df[df["CIDADE"] == cidade_selecionada]
+
+# Função de categorização
+def classificar_cto(row):
+    chave = (row["POP"], row["CHASSI"], row["PLACA"], row["OLT"])
+    total = portas_por_caminho.get(chave, 0)
+
+    if total >= 128:
+        if row["PORTAS"] == 8:
+            return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
+        elif row["PORTAS"] == 16:
+            return "🔴 SATURADO"
     else:
-        return "⚪ STATUS INDEFINIDO"
+        if row["PORTAS"] == 16:
+            return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
+        elif row["PORTAS"] == 8:
+            return "✅ TROCA DE SP8 PARA SP16"
 
-# Aplica a função
-df["STATUS"] = df.apply(obter_status, axis=1)
+    return "⚠️ DADO INSUFICIENTE"
 
-# Filtros interativos
-col1, col2, col3 = st.columns(3)
+# Aplica a classificação
+df_filtrado["CATEGORIA"] = df_filtrado.apply(classificar_cto, axis=1)
 
-with col1:
-    cidades = df["CIDADE"].dropna().unique()
-    cidade_selecionada = st.selectbox("🌆 Filtrar por Cidade:", ["Todas"] + sorted(cidades.tolist()))
+# Separa os dois blocos
+ctos_usaveis = df_filtrado[df_filtrado["CATEGORIA"].str.startswith("✅")]
+ctos_inviaveis = df_filtrado[df_filtrado["CATEGORIA"].str.startswith("🔴")]
 
-with col2:
-    status_uso = st.selectbox(
-        "🟢 CTOs que podemos usar:",
-        ["Todos", "✅ TROCA DE SP8 PARA SP16", "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"]
-    )
+# Exibe resultados
+st.subheader("✅ CTOs que PODEMOS usar:")
+st.dataframe(ctos_usaveis.reset_index(drop=True), use_container_width=True)
 
-with col3:
-    status_nao_uso = st.selectbox(
-        "🔴 CTOs que NÃO podemos usar:",
-        ["Todos", "🔴 SATURADO", "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"]
-    )
-
-# Filtragem de dados
-df_filtrado = df.copy()
-
-if cidade_selecionada != "Todas":
-    df_filtrado = df_filtrado[df_filtrado["CIDADE"] == cidade_selecionada]
-
-if status_uso != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["STATUS"] == status_uso]
-
-if status_nao_uso != "Todos":
-    df_filtrado = df_filtrado[df_filtrado["STATUS"] == status_nao_uso]
-
-# Exibir colunas disponíveis (ajuda a identificar erros)
-st.caption(f"🔎 Colunas disponíveis: {', '.join(df_filtrado.columns)}")
-
-# Valida se há coordenadas para o mapa
-if "LAT" not in df_filtrado.columns or "LONG" not in df_filtrado.columns:
-    st.error("❌ As colunas LAT e LONG são obrigatórias para exibir o mapa.")
-    st.stop()
-
-# Garantir que LAT e LONG sejam números válidos
-df_filtrado["LAT"] = pd.to_numeric(df_filtrado["LAT"], errors="coerce")
-df_filtrado["LONG"] = pd.to_numeric(df_filtrado["LONG"], errors="coerce")
-
-# Remover linhas com coordenadas inválidas
-df_filtrado = df_filtrado.dropna(subset=["LAT", "LONG"])
-
-# Verificação final
-if df_filtrado.empty:
-    st.error("❌ Nenhuma linha válida com coordenadas encontradas.")
-    st.stop()
-
-# Calcular centro do mapa
-lat_centro = df_filtrado["LAT"].mean()
-lon_centro = df_filtrado["LONG"].mean()
-
-m = folium.Map(location=[lat_centro, lon_centro], zoom_start=13)
-
-# Adiciona marcadores ao mapa
-for _, row in df_filtrado.iterrows():
-    cor = "green" if "✅" in row["STATUS"] else "red"
-    nome_cto = row.get("CTO", "NOME ANTIGO CTO")
-
-    folium.Marker(
-        location=[row["LAT"], row["LONG"]],
-        tooltip=f"CTO: {nome_cto}",
-        popup=(
-            f"<b>CTO:</b> {nome_cto}<br>"
-            f"<b>Status:</b> {row['STATUS']}<br>"
-            f"<b>Portas:</b> {row.get('PORTAS', '-') }<br>"
-            f"<b>Caminho:</b> {row.get('CAMINHO_REDE', '-')}"
-        ),
-        icon=folium.Icon(color=cor)
-    ).add_to(m)
-
-# Exibe o mapa
-st_data = st_folium(m, width=1200, height=600)
-
-# Tabela com os dados filtrados
-st.subheader("📊 Tabela de Dados Filtrados")
-st.dataframe(df_filtrado.reset_index(drop=True), use_container_width=True)
+st.subheader("🔴 CTOs que NÃO PODEMOS usar:")
+st.dataframe(ctos_inviaveis.reset_index(drop=True), use_container_width=True)
