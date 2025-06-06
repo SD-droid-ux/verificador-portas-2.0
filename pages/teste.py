@@ -16,16 +16,29 @@ def carregar_dados():
         df["OLT"].astype(str)
     )
 
-    # Convertendo LAT e LONG para numérico, tratando erros
+    # Converter LAT e LONG para numérico, valores inválidos virarão NaN
     df["LAT"] = pd.to_numeric(df["LAT"], errors="coerce")
     df["LONG"] = pd.to_numeric(df["LONG"], errors="coerce")
 
-    # Remove linhas com LAT ou LONG inválidas
+    # Remover linhas com NaN em LAT ou LONG
     df = df.dropna(subset=["LAT", "LONG"])
+
+    # Remover latitudes fora do intervalo válido [-90, 90]
+    df = df[(df["LAT"] >= -90) & (df["LAT"] <= 90)]
+
+    # Remover longitudes fora do intervalo válido [-180, 180]
+    df = df[(df["LONG"] >= -180) & (df["LONG"] <= 180)]
 
     return df
 
 df = carregar_dados()
+
+# Mostrar possíveis dados inválidos para debug (pode remover depois)
+df_invalid_lat = df[(df["LAT"] < -90) | (df["LAT"] > 90)]
+df_invalid_long = df[(df["LONG"] < -180) | (df["LONG"] > 180)]
+
+if not df_invalid_lat.empty or not df_invalid_long.empty:
+    st.warning("⚠️ Existem dados com coordenadas inválidas que foram removidos.")
 
 st.title("📍 Buscar CTOs Próximas e Disponíveis")
 
@@ -50,13 +63,19 @@ if st.button("🔍 Buscar CTOs Disponíveis em até 250m"):
         df_candidatas["TOTAL_PORTAS_CAMINHO"] = df_candidatas["CAMINHO_REDE"].map(portas_por_caminho)
         df_candidatas = df_candidatas[df_candidatas["TOTAL_PORTAS_CAMINHO"] < 128]
 
-        # Lista para armazenar CTOs próximas
         proximas = []
 
         for _, row_inv in df_invalidas.iterrows():
             lat_inv, long_inv = row_inv["LAT"], row_inv["LONG"]
             for _, row_cand in df_candidatas.iterrows():
                 lat_cand, long_cand = row_cand["LAT"], row_cand["LONG"]
+
+                # Se alguma coordenada for inválida, ignora (proteção extra)
+                if not (-90 <= lat_inv <= 90 and -180 <= long_inv <= 180):
+                    continue
+                if not (-90 <= lat_cand <= 90 and -180 <= long_cand <= 180):
+                    continue
+
                 distancia = geodesic((lat_inv, long_inv), (lat_cand, long_cand)).meters
                 if distancia <= 250:
                     proximas.append(row_cand)
