@@ -27,13 +27,17 @@ else:
             def obter_status(row):
                 total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
                 if total > 128:
-                    return "🔴 Saturado"
-                elif total == 128:
-                    return "🟡 Caminho de Rede já é 128"
-                elif row["PORTAS"] == 16:
-                    return "⚠️ 16 portas (fora padrão)"
+                    return "🔴 SATURADO"
+                elif total == 128 and row["PORTAS"] == 16:
+                    return "🔴 SATURADO"
+                elif total == 128 and row["PORTAS"] == 8:
+                    return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
+                elif row["PORTAS"] == 16 and total < 128:
+                    return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
+                elif row["PORTAS"] == 8 and total < 128:
+                    return "✅ TROCA DE SP8 PARA SP16"
                 else:
-                    return "✅ OK"
+                    return "⚪ STATUS INDEFINIDO"
 
             df_ctos["STATUS"] = df_ctos.apply(obter_status, axis=1)
             st.dataframe(df_ctos)
