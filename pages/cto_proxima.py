@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="🔍 CTO Próxima", layout="wide")
+st.set_page_config(page_title="🔍 CT Próxima", layout="wide")
 st.title("🔍 Classificação de CTOs Utilizáveis e Saturadas")
 
 # Caminho do arquivo Excel salvo localmente
