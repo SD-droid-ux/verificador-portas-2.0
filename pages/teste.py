@@ -8,7 +8,7 @@ st.title("📍 CTOs Próximas com 8 Portas e PON Disponível")
 # Carrega a base de dados do repositório local
 @st.cache_data
 def carregar_dados():
-    return pd.read_excel("base_de_dados/base.xlsx")
+    return pd.read_excel("pages/base_de_dados/base.xlsx")
 
 df = carregar_dados()
 
