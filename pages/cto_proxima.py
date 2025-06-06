@@ -1,51 +1,57 @@
 import streamlit as st
 import pandas as pd
 
-st.title("🔍 Análise de CTOs utilizáveis e não utilizáveis")
+st.set_page_config(page_title="🔍 CTOs Próximas", layout="wide")
+st.title("🔍 Análise de CTOs Utilizáveis e Saturadas")
 
-# Verifica se os dados foram carregados no main.py
-if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
-    st.error("❌ Dados não encontrados. Faça o upload da base no menu principal.")
+# Verifica se o DataFrame já foi carregado no main.py
+if "dataframe" not in st.session_state:
+    st.error("⚠️ Nenhum arquivo carregado. Volte à tela inicial e envie a planilha.")
     st.stop()
 
-# Carrega os dados do session_state
-df = st.session_state.df.copy()
-portas_por_caminho = st.session_state.portas_por_caminho.copy()
+# Obtém o DataFrame
+df = st.session_state.dataframe.copy()
 
 # Filtro por cidade
-cidades_disponiveis = sorted(df["CIDADE"].dropna().unique())
-cidade_selecionada = st.selectbox("Selecione a cidade:", cidades_disponiveis)
+cidade = st.selectbox("Selecione a cidade:", sorted(df["CIDADE"].dropna().unique()))
+df = df[df["CIDADE"] == cidade].copy()
 
-df_filtrado = df[df["CIDADE"] == cidade_selecionada]
+# Normaliza colunas
+for col in ["POP", "CHASSI", "PLACA", "OLT"]:
+    df[col] = df[col].astype(str).str.strip().str.upper()
+
+df["PORTAS"] = pd.to_numeric(df["PORTAS"], errors="coerce")
+
+# Soma total de portas por grupo
+total_portas_por_grupo = df.groupby(["POP", "CHASSI", "PLACA", "OLT"])["PORTAS"].sum().to_dict()
 
 # Função de categorização
-def classificar_cto(row):
+def categorizar(row):
     chave = (row["POP"], row["CHASSI"], row["PLACA"], row["OLT"])
-    total = portas_por_caminho.get(chave, 0)
+    total = total_portas_por_grupo.get(chave, 0)
 
     if total >= 128:
-        if row["PORTAS"] == 8:
-            return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
-        elif row["PORTAS"] == 16:
-            return "🔴 SATURADO"
+        return "🔴 SATURADO"
+    elif row["PORTAS"] == 16 and total < 128:
+        return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
+    elif row["PORTAS"] == 8 and total < 128:
+        return "✅ TROCA DE SP8 PARA SP16"
     else:
-        if row["PORTAS"] == 16:
-            return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
-        elif row["PORTAS"] == 8:
-            return "✅ TROCA DE SP8 PARA SP16"
+        return "🔴 SATURADO"
 
-    return "⚠️ DADO INSUFICIENTE"
+# Aplica categorização
+df["CATEGORIA"] = df.apply(categorizar, axis=1)
 
-# Aplica a classificação
-df_filtrado["CATEGORIA"] = df_filtrado.apply(classificar_cto, axis=1)
-
-# Separa os dois blocos
-ctos_usaveis = df_filtrado[df_filtrado["CATEGORIA"].str.startswith("✅")]
-ctos_inviaveis = df_filtrado[df_filtrado["CATEGORIA"].str.startswith("🔴")]
+# Divide os blocos
+df_uso = df[df["CATEGORIA"].str.startswith("✅")].copy()
+df_n_uso = df[df["CATEGORIA"].str.startswith("🔴")].copy()
 
 # Exibe resultados
-st.subheader("✅ CTOs que PODEMOS usar:")
-st.dataframe(ctos_usaveis.reset_index(drop=True), use_container_width=True)
+st.subheader("✅ CTOs que PODEMOS usar")
+st.dataframe(df_uso, use_container_width=True)
 
-st.subheader("🔴 CTOs que NÃO PODEMOS usar:")
-st.dataframe(ctos_inviaveis.reset_index(drop=True), use_container_width=True)
+st.subheader("🔴 CTOs que NÃO PODEMOS usar")
+if df_n_uso.empty:
+    st.info("Nenhuma CTO saturada encontrada.")
+else:
+    st.dataframe(df_n_uso, use_container_width=True)
