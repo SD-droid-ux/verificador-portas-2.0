@@ -89,7 +89,7 @@ if df_filtrado.empty:
 lat_centro = df_filtrado["LAT"].mean()
 lon_centro = df_filtrado["LONG"].mean()
 
-m = folium.Map(location=[lat_centro, long_centro], zoom_start=13)
+m = folium.Map(location=[lat_centro, lon_centro], zoom_start=13)
 
 # Adiciona marcadores ao mapa
 for _, row in df_filtrado.iterrows():
