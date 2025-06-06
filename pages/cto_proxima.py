@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from streamlit_google_maps import st_google_maps
+import pydeck as pdk
 
 st.title("3. CTOs Próximas")
 
@@ -12,9 +12,33 @@ else:
     st.write("Visualização rápida da base carregada:")
     st.dataframe(df.head())
 
-    # Mapa interativo do Brasil centralizado (aprox coords do Brasil)
-    center = {"lat": -14.2350, "lng": -51.9253}
-    zoom = 4  # zoom inicial para visualizar estados
+    # Verifica se há colunas de coordenadas
+    if {"LAT", "LONG"}.issubset(df.columns):
+        df_mapa = df.dropna(subset=["LAT", "LONG"]).copy()
+        df_mapa = df_mapa[df_mapa["LAT"].between(-90, 90) & df_mapa["LONG"].between(-180, 180)]
 
-    # Exibe o mapa
-    st_google_maps(api_key=st.secrets["AIzaSyCi8uWlWbc29rBGm8fjvg-luxvdYGXEICU"], center=center, zoom=zoom)
+        st.subheader("🌎 Mapa Interativo")
+
+        st.pydeck_chart(pdk.Deck(
+            map_style="mapbox://styles/mapbox/light-v9",
+            initial_view_state=pdk.ViewState(
+                latitude=-14.2350,
+                longitude=-51.9253,
+                zoom=4,
+                pitch=0,
+            ),
+            layers=[
+                pdk.Layer(
+                    "ScatterplotLayer",
+                    data=df_mapa,
+                    get_position='[LONG, LAT]',
+                    get_radius=100,
+                    get_color='[255, 0, 0, 160]',
+                    pickable=True,
+                ),
+            ],
+            tooltip={"text": "CTO: {CTO}\nCidade: {CIDADE}"},
+        ))
+    else:
+        st.error("A base precisa ter as colunas LAT e LONG com coordenadas geográficas.")
+
