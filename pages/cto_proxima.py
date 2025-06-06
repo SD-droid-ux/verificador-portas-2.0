@@ -1,40 +1,50 @@
 import streamlit as st
 import pandas as pd
+import os
 
-st.set_page_config(page_title="🔍 CTOs Próximas", layout="wide")
-st.title("🔍 Análise de CTOs Utilizáveis e Saturadas")
+st.set_page_config(page_title="🔍 CTO Próxima", layout="wide")
+st.title("🔍 Classificação de CTOs Utilizáveis e Saturadas")
 
-# Verifica se os dados foram carregados no main.py
-if "dataframe" not in st.session_state or st.session_state["dataframe"] is None:
-    st.error("⚠️ Nenhum arquivo carregado. Volte à tela inicial e envie a planilha.")
+# Caminho do arquivo Excel salvo localmente
+caminho_arquivo = os.path.join("pages", "base_de_dados", "base.xlsx")
+
+# Carregando os dados da base
+@st.cache_data(ttl=600)
+def carregar_base():
+    try:
+        df = pd.read_excel(caminho_arquivo)
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar a planilha: {e}")
+        return None
+
+df = carregar_base()
+if df is None:
     st.stop()
 
-# Carrega os dados salvos pelo main.py
-df = st.session_state["dataframe"].copy()
-
-# Verifica se colunas essenciais estão presentes
+# Verificando colunas obrigatórias
 colunas_necessarias = {"CIDADE", "POP", "CHASSI", "PLACA", "OLT", "PORTAS", "CTO"}
 if not colunas_necessarias.issubset(df.columns):
     st.error("❌ A planilha está faltando colunas obrigatórias: " + ", ".join(colunas_necessarias - set(df.columns)))
     st.stop()
 
-# Filtro por cidade
-cidade = st.selectbox("Selecione a cidade:", sorted(df["CIDADE"].dropna().unique()))
-df = df[df["CIDADE"] == cidade].copy()
-
-# Normaliza colunas
+# Normalização
 for col in ["POP", "CHASSI", "PLACA", "OLT"]:
     df[col] = df[col].astype(str).str.strip().str.upper()
 
 df["PORTAS"] = pd.to_numeric(df["PORTAS"], errors="coerce").fillna(0).astype(int)
 
-# Soma total de portas por grupo
-total_portas_por_grupo = df.groupby(["POP", "CHASSI", "PLACA", "OLT"])["PORTAS"].sum().to_dict()
+# Filtro por cidade
+cidade = st.selectbox("Selecione a cidade:", sorted(df["CIDADE"].dropna().unique()))
+df = df[df["CIDADE"] == cidade].copy()
 
-# Função de categorização
-def categorizar(row):
+# Total de portas por grupo
+total_por_grupo = df.groupby(["POP", "CHASSI", "PLACA", "OLT"])["PORTAS"].sum().to_dict()
+
+# Classificação
+def classificar(row):
     chave = (row["POP"], row["CHASSI"], row["PLACA"], row["OLT"])
-    total = total_portas_por_grupo.get(chave, 0)
+    total = total_por_grupo.get(chave, 0)
 
     if total >= 128:
         return "🔴 SATURADO"
@@ -45,19 +55,18 @@ def categorizar(row):
     else:
         return "🔴 SATURADO"
 
-# Aplica a categorização
-df["CATEGORIA"] = df.apply(categorizar, axis=1)
+df["CATEGORIA"] = df.apply(classificar, axis=1)
 
-# Divide em blocos
-df_uso = df[df["CATEGORIA"].str.startswith("✅")].copy()
-df_n_uso = df[df["CATEGORIA"].str.startswith("🔴")].copy()
+# Separando categorias
+df_pode = df[df["CATEGORIA"].str.startswith("✅")].copy()
+df_nao_pode = df[df["CATEGORIA"].str.startswith("🔴")].copy()
 
-# Exibição
-st.subheader("✅ CTOs que PODEMOS usar")
-st.dataframe(df_uso, use_container_width=True)
+# Exibindo resultados
+st.subheader("✅ CTOs que PODEM ser trocadas")
+st.dataframe(df_pode, use_container_width=True)
 
-st.subheader("🔴 CTOs que NÃO PODEMOS usar")
-if df_n_uso.empty:
+st.subheader("🔴 CTOs que NÃO PODEM ser trocadas")
+if df_nao_pode.empty:
     st.info("Nenhuma CTO saturada encontrada.")
 else:
-    st.dataframe(df_n_uso, use_container_width=True)
+    st.dataframe(df_nao_pode, use_container_width=True)
