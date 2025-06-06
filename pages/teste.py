@@ -6,7 +6,7 @@ st.set_page_config(page_title="CTOs Próximas e Disponíveis", layout="wide")
 
 @st.cache_data
 def carregar_dados():
-    df = pd.read_excel("base_de_dados/base.xlsx")
+    df = pd.read_excel("pages/base_de_dados/base.xlsx")
 
     # Criar coluna CAMINHO_REDE com base em POP, CHASSI, PLACA, OLT
     df["CAMINHO_REDE"] = (
