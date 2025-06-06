@@ -16,9 +16,11 @@ def carregar_dados():
         df["OLT"].astype(str)
     )
 
-    # Garantir que LAT/LONG sejam float
-    df["LAT"] = df["LAT"].astype(float)
-    df["LONG"] = df["LONG"].astype(float)
+        df["LAT"] = pd.to_numeric(df["LAT"], errors="coerce")
+        df["LONG"] = pd.to_numeric(df["LONG"], errors="coerce")
+
+        # Remove linhas com LAT ou LONG inválidas
+        df = df.dropna(subset=["LAT", "LONG"])
 
     return df
 
