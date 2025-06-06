@@ -3,24 +3,18 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 
-st.title("📍 Mapa de CTOs com Filtros")
+st.title("🔍 CTOs Próximas Utilizáveis")
 
-# Simula a criação ou carregamento da base e portas_por_caminho
+# Verifica se os dados estão disponíveis na sessão
 if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
-    # Substitua aqui pela leitura real do seu arquivo
-    df = pd.read_excel('data/base.xlsx')
+    st.warning("⚠️ Por favor, faça o upload da base de dados na página inicial antes de acessar esta aba.")
+    st.stop()
 
-    # Calcula o total de portas por caminho de rede
-    portas_por_caminho = df.groupby('CAMINHO_REDE')['PORTAS'].sum().to_dict()
-
-    # Armazena no session_state
-    st.session_state.df = df
-    st.session_state.portas_por_caminho = portas_por_caminho
-
-df = st.session_state.df
+# Carrega os dados da sessão
+df = st.session_state.df.copy()
 portas_por_caminho = st.session_state.portas_por_caminho
 
-# Função para definir o status
+# Função de status
 def obter_status(row):
     total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
     if total > 128:
@@ -36,51 +30,50 @@ def obter_status(row):
     else:
         return "⚪ STATUS INDEFINIDO"
 
-# Aplica a coluna STATUS apenas uma vez e salva
-if "df_status" not in st.session_state:
-    df = df.copy()
-    df["STATUS"] = df.apply(obter_status, axis=1)
-    st.session_state.df_status = df
-else:
-    df = st.session_state.df_status
+# Aplica o status ao DataFrame
+df["STATUS"] = df.apply(obter_status, axis=1)
 
-# Definindo os grupos
-status_nao_usar = [
+# Filtros na interface
+st.subheader("Filtros")
+cidades = df["CIDADE"].dropna().unique().tolist()
+cidade_selecionada = st.selectbox("Cidade", ["Todas"] + sorted(cidades))
+
+status_opcoes = [
+    "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA",
+    "✅ TROCA DE SP8 PARA SP16",
     "🔴 SATURADO",
     "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
 ]
-
-status_pode_usar = [
-    "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA",
-    "✅ TROCA DE SP8 PARA SP16"
-]
-
-df_nao_usar = df[df["STATUS"].isin(status_nao_usar)]
-df_pode_usar = df[df["STATUS"].isin(status_pode_usar)]
-
-# Seleção do grupo no Streamlit
-grupo = st.selectbox(
-    "Selecione o grupo de CTOs para mostrar no mapa:",
-    options=["CTOs que NÃO podemos usar", "CTOs que podemos usar"]
+status_selecionado = st.multiselect(
+    "Filtrar por status",
+    status_opcoes,
+    default=status_opcoes  # Exibe todos por padrão
 )
 
-df_mapa = df_nao_usar if grupo == "CTOs que NÃO podemos usar" else df_pode_usar
+# Aplica os filtros
+df_filtrado = df.copy()
+if cidade_selecionada != "Todas":
+    df_filtrado = df_filtrado[df_filtrado["CIDADE"] == cidade_selecionada]
+if status_selecionado:
+    df_filtrado = df_filtrado[df_filtrado["STATUS"].isin(status_selecionado)]
 
-# Converter LAT e LONG para numérico, removendo linhas inválidas
-df_mapa['LAT'] = pd.to_numeric(df_mapa['LAT'], errors='coerce')
-df_mapa['LONG'] = pd.to_numeric(df_mapa['LONG'], errors='coerce')
-df_mapa = df_mapa.dropna(subset=['LAT', 'LONG'])
+# Converte coordenadas
+df_filtrado["LAT"] = pd.to_numeric(df_filtrado["LAT"], errors="coerce")
+df_filtrado["LONG"] = pd.to_numeric(df_filtrado["LONG"], errors="coerce")
+df_filtrado = df_filtrado.dropna(subset=["LAT", "LONG"])
 
-if df_mapa.empty:
-    st.warning("Nenhum dado com coordenadas válido para o grupo selecionado.")
+# Mapa
+st.subheader("📍 Mapa Interativo")
+
+if df_filtrado.empty:
+    st.info("Nenhuma CTO encontrada com os filtros selecionados.")
 else:
-    lat_centro = df_mapa["LAT"].mean()
-    lon_centro = df_mapa["LONG"].mean()
-    m = folium.Map(location=[lat_centro, lon_centro], zoom_start=14)
-    
-    cor = "red" if grupo == "CTOs que NÃO podemos usar" else "green"
+    lat_centro = df_filtrado["LAT"].mean()
+    lon_centro = df_filtrado["LONG"].mean()
+    m = folium.Map(location=[lat_centro, lon_centro], zoom_start=13)
 
-    for _, row in df_mapa.iterrows():
+    for _, row in df_filtrado.iterrows():
+        cor = "green" if "✅" in row["STATUS"] else "red"
         folium.Marker(
             location=[row["LAT"], row["LONG"]],
             tooltip=f"CTO: {row['CTO']}",
@@ -92,4 +85,8 @@ else:
             icon=folium.Icon(color=cor)
         ).add_to(m)
 
-    st_folium(m, width=700, height=500)
+    st_data = st_folium(m, width=800, height=500)
+
+# Exibe tabela abaixo
+st.subheader("📋 Tabela de Dados Filtrados")
+st.dataframe(df_filtrado.reset_index(drop=True), use_container_width=True)
