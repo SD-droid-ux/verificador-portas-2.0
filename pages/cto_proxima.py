@@ -73,9 +73,21 @@ if "LAT" not in df_filtrado.columns or "LONG" not in df_filtrado.columns:
     st.error("❌ As colunas LAT e LONG são obrigatórias para exibir o mapa.")
     st.stop()
 
-# Cria o mapa
+# Garantir que LAT e LONG sejam números válidos
+df_filtrado["LAT"] = pd.to_numeric(df_filtrado["LAT"], errors="coerce")
+df_filtrado["LONG"] = pd.to_numeric(df_filtrado["LONG"], errors="coerce")
+
+# Remover linhas com coordenadas inválidas
+df_filtrado = df_filtrado.dropna(subset=["LAT", "LONG"])
+
+# Verificação final
+if df_filtrado.empty:
+    st.error("❌ Nenhuma linha válida com coordenadas encontradas.")
+    st.stop()
+
+# Calcular centro do mapa
 lat_centro = df_filtrado["LAT"].mean()
-long_centro = df_filtrado["LONG"].mean()
+lon_centro = df_filtrado["LONG"].mean()
 
 m = folium.Map(location=[lat_centro, long_centro], zoom_start=13)
 
