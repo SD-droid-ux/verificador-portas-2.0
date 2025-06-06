@@ -15,6 +15,12 @@ else:
     # Verifica se há colunas de coordenadas
     if {"LAT", "LONG"}.issubset(df.columns):
         df_mapa = df.dropna(subset=["LAT", "LONG"]).copy()
+
+        # 🔧 Conversão segura para tipo numérico
+        df_mapa["LAT"] = pd.to_numeric(df_mapa["LAT"], errors="coerce")
+        df_mapa["LONG"] = pd.to_numeric(df_mapa["LONG"], errors="coerce")
+
+        # 🔍 Filtra coordenadas válidas
         df_mapa = df_mapa[df_mapa["LAT"].between(-90, 90) & df_mapa["LONG"].between(-180, 180)]
 
         st.subheader("🌎 Mapa Interativo")
@@ -41,4 +47,3 @@ else:
         ))
     else:
         st.error("A base precisa ter as colunas LAT e LONG com coordenadas geográficas.")
-
