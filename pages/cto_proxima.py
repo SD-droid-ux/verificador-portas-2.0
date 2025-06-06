@@ -4,13 +4,19 @@ import pandas as pd
 st.set_page_config(page_title="🔍 CTOs Próximas", layout="wide")
 st.title("🔍 Análise de CTOs Utilizáveis e Saturadas")
 
-# Verifica se o DataFrame já foi carregado no main.py
-if "dataframe" not in st.session_state:
+# Verifica se os dados foram carregados no main.py
+if "dataframe" not in st.session_state or st.session_state["dataframe"] is None:
     st.error("⚠️ Nenhum arquivo carregado. Volte à tela inicial e envie a planilha.")
     st.stop()
 
-# Obtém o DataFrame
-df = st.session_state.dataframe.copy()
+# Carrega os dados salvos pelo main.py
+df = st.session_state["dataframe"].copy()
+
+# Verifica se colunas essenciais estão presentes
+colunas_necessarias = {"CIDADE", "POP", "CHASSI", "PLACA", "OLT", "PORTAS", "CTO"}
+if not colunas_necessarias.issubset(df.columns):
+    st.error("❌ A planilha está faltando colunas obrigatórias: " + ", ".join(colunas_necessarias - set(df.columns)))
+    st.stop()
 
 # Filtro por cidade
 cidade = st.selectbox("Selecione a cidade:", sorted(df["CIDADE"].dropna().unique()))
@@ -20,7 +26,7 @@ df = df[df["CIDADE"] == cidade].copy()
 for col in ["POP", "CHASSI", "PLACA", "OLT"]:
     df[col] = df[col].astype(str).str.strip().str.upper()
 
-df["PORTAS"] = pd.to_numeric(df["PORTAS"], errors="coerce")
+df["PORTAS"] = pd.to_numeric(df["PORTAS"], errors="coerce").fillna(0).astype(int)
 
 # Soma total de portas por grupo
 total_portas_por_grupo = df.groupby(["POP", "CHASSI", "PLACA", "OLT"])["PORTAS"].sum().to_dict()
@@ -39,14 +45,14 @@ def categorizar(row):
     else:
         return "🔴 SATURADO"
 
-# Aplica categorização
+# Aplica a categorização
 df["CATEGORIA"] = df.apply(categorizar, axis=1)
 
-# Divide os blocos
+# Divide em blocos
 df_uso = df[df["CATEGORIA"].str.startswith("✅")].copy()
 df_n_uso = df[df["CATEGORIA"].str.startswith("🔴")].copy()
 
-# Exibe resultados
+# Exibição
 st.subheader("✅ CTOs que PODEMOS usar")
 st.dataframe(df_uso, use_container_width=True)
 
