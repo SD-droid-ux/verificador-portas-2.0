@@ -3,7 +3,7 @@ import time
 import pandas as pd
 import os
 
-st.title("🔍 2. Buscar por CTO")
+st.title("🔍 Buscar por CTO")
 
 # Caminho da base de dados
 caminho_base = os.path.join("pages", "base_de_dados", "base.xlsx")
