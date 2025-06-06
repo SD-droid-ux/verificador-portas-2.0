@@ -22,7 +22,7 @@ if uploaded_file:
         # Pré-calcular soma de portas por caminho de rede
         portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
 
-        # ✅ Salva no session_state
+        # Salvar no session_state para acesso global nas páginas
         st.session_state["df"] = df
         st.session_state["portas_por_caminho"] = portas_por_caminho
 
@@ -44,3 +44,10 @@ if uploaded_file:
         st.metric("🔢 Total de CTOs", total_ctos)
         st.metric("🔌 Total de Portas", total_portas)
         st.metric("🔴 Caminhos Saturados", len(saturados))
+
+else:
+    st.info("⏳ Por favor, envie a planilha Excel para começar.")
+
+# Proteção para garantir que session_state tenha os dados mesmo que a página seja recarregada
+if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
+    st.warning("⚠️ Faça o upload da planilha Excel para carregar os dados e usar as funcionalidades.")
