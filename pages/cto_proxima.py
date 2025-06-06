@@ -23,7 +23,7 @@ if df is None:
     st.stop()
 
 # Verificando colunas obrigatórias
-colunas_necessarias = {"CIDADE", "POP", "CHASSI", "PLACA", "OLT", "PORTAS", "CTO"}
+colunas_necessarias = {"CIDADE", "POP", "CHASSI", "PLACA", "OLT", "PORTAS", "NOME ANTIGO CTO"}
 if not colunas_necessarias.issubset(df.columns):
     st.error("❌ A planilha está faltando colunas obrigatórias: " + ", ".join(colunas_necessarias - set(df.columns)))
     st.stop()
