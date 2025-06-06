@@ -17,4 +17,4 @@ else:
     zoom = 4  # zoom inicial para visualizar estados
 
     # Exibe o mapa
-    st_google_maps(api_key=st.secrets["GOOGLE_MAPS_API_KEY"], center=center, zoom=zoom)
+    st_google_maps(api_key=st.secrets["AIzaSyCi8uWlWbc29rBGm8fjvg-luxvdYGXEICU"], center=center, zoom=zoom)
