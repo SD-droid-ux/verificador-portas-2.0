@@ -13,7 +13,7 @@ if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
     try:
         df = pd.read_excel(caminho_base)
         df["CAMINHO_REDE"] = df["pop"].astype(str) + "/" + df["olt"].astype(str) + "/" + df["slot"].astype(str) + "/" + df["pon"].astype(str)
-        portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
+        portas_por_caminho = df.groupby("CAMINHO_REDE")["portas"].sum().to_dict()
         st.session_state["df"] = df
         st.session_state["portas_por_caminho"] = portas_por_caminho
     except FileNotFoundError:
@@ -55,7 +55,7 @@ if st.button("🔍 Buscar CTOs"):
                 else:
                     return "⚪ STATUS INDEFINIDO"
 
-            df_ctos["status_cto"] = df_ctos.apply(obter_status, axis=1)
+            df_ctos["STATUS"] = df_ctos.apply(obter_status, axis=1)
 
             if df_ctos.empty:
                 st.info("Nenhuma CTO encontrada para os IDs informados.")
