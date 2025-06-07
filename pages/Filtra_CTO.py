@@ -12,7 +12,7 @@ caminho_base = os.path.join("pages", "base_de_dados", "base.xlsx")
 if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
     try:
         df = pd.read_excel(caminho_base)
-        df["CAMINHO_REDE"] = df["POP"].astype(str) + "/" + df["CHASSI"].astype(str) + "/" + df["PLACA"].astype(str) + "/" + df["OLT"].astype(str)
+        df["CAMINHO_REDE"] = df["pop"].astype(str) + "/" + df["olt"].astype(str) + "/" + df["slot"].astype(str) + "/" + df["pon"].astype(str)
         portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
         st.session_state["df"] = df
         st.session_state["portas_por_caminho"] = portas_por_caminho
@@ -36,26 +36,26 @@ if st.button("🔍 Buscar CTOs"):
                 time.sleep(0.1)
                 progress_bar.progress((i + 1) * 20)
 
-            df_ctos = df[df["NOME ANTIGO CTO"].str.upper().isin(input_ctos)].copy()
-            df_ctos["ordem"] = pd.Categorical(df_ctos["NOME ANTIGO CTO"].str.upper(), categories=input_ctos, ordered=True)
+            df_ctos = df[df["cto"].str.upper().isin(input_ctos)].copy()
+            df_ctos["ordem"] = pd.Categorical(df_ctos["cto"].str.upper(), categories=input_ctos, ordered=True)
             df_ctos = df_ctos.sort_values("ordem").drop(columns=["ordem"])
 
             def obter_status(row):
                 total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
                 if total > 128:
                     return "🔴 SATURADO"
-                elif total == 128 and row["PORTAS"] == 16:
+                elif total == 128 and row["portas"] == 16:
                     return "🔴 SATURADO"
-                elif total == 128 and row["PORTAS"] == 8:
+                elif total == 128 and row["portas"] == 8:
                     return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
-                elif row["PORTAS"] == 16 and total < 128:
+                elif row["portas"] == 16 and total < 128:
                     return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
-                elif row["PORTAS"] == 8 and total < 128:
+                elif row["portas"] == 8 and total < 128:
                     return "✅ TROCA DE SP8 PARA SP16"
                 else:
                     return "⚪ STATUS INDEFINIDO"
 
-            df_ctos["STATUS"] = df_ctos.apply(obter_status, axis=1)
+            df_ctos["status_cto"] = df_ctos.apply(obter_status, axis=1)
 
             if df_ctos.empty:
                 st.info("Nenhuma CTO encontrada para os IDs informados.")
