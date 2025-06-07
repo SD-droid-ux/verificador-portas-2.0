@@ -23,34 +23,34 @@ if df is None:
     st.stop()
 
 # Verificando colunas obrigatórias
-colunas_necessarias = {"CIDADE", "POP", "CHASSI", "PLACA", "OLT", "PORTAS", "NOME ANTIGO CTO"}
+colunas_necessarias = {"cid_rede", "pop", "olt", "slot", "pon", "portas", "cto"}
 if not colunas_necessarias.issubset(df.columns):
     st.error("❌ A planilha está faltando colunas obrigatórias: " + ", ".join(colunas_necessarias - set(df.columns)))
     st.stop()
 
 # Normalização
-for col in ["POP", "CHASSI", "PLACA", "OLT"]:
+for col in ["pop", "olt", "slot", "pon"]:
     df[col] = df[col].astype(str).str.strip().str.upper()
 
-df["PORTAS"] = pd.to_numeric(df["PORTAS"], errors="coerce").fillna(0).astype(int)
+df["portas"] = pd.to_numeric(df["portas"], errors="coerce").fillna(0).astype(int)
 
 # Filtro por cidade
-cidade = st.selectbox("Selecione a cidade:", sorted(df["CIDADE"].dropna().unique()))
-df = df[df["CIDADE"] == cidade].copy()
+cidade = st.selectbox("Selecione a cidade:", sorted(df["cid_rede"].dropna().unique()))
+df = df[df["cid_rede"] == cidade].copy()
 
 # Total de portas por grupo
-total_por_grupo = df.groupby(["POP", "CHASSI", "PLACA", "OLT"])["PORTAS"].sum().to_dict()
+total_por_grupo = df.groupby(["pop", "olt", "slot", "pon"])["portas"].sum().to_dict()
 
 # Classificação
 def classificar(row):
-    chave = (row["POP"], row["CHASSI"], row["PLACA"], row["OLT"])
+    chave = (row["pop"], row["olt"], row["slot"], row["pon"])
     total = total_por_grupo.get(chave, 0)
 
     if total >= 128:
         return "🔴 SATURADO"
-    elif row["PORTAS"] == 16 and total < 128:
+    elif row["portas"] == 16 and total < 128:
         return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
-    elif row["PORTAS"] == 8 and total < 128:
+    elif row["portas"] == 8 and total < 128:
         return "✅ TROCA DE SP8 PARA SP16"
     else:
         return "🔴 SATURADO"
