@@ -10,10 +10,10 @@ def carregar_dados():
 
     # Criar coluna CAMINHO_REDE com base em POP, CHASSI, PLACA, OLT
     df["CAMINHO_REDE"] = (
-        df["POP"].astype(str) + "_" +
-        df["CHASSI"].astype(str) + "_" +
-        df["PLACA"].astype(str) + "_" +
-        df["OLT"].astype(str)
+        df["pop"].astype(str) + "_" +
+        df["olt"].astype(str) + "_" +
+        df["slot"].astype(str) + "_" +
+        df["pon"].astype(str)
     )
 
     # Converter LAT e LONG para numérico, valores inválidos virarão NaN
@@ -50,16 +50,16 @@ if st.button("🔍 Buscar CTOs Disponíveis em até 250m"):
         st.warning("⚠️ Por favor, insira ao menos uma CTO inválida.")
     else:
         lista_ctos_invalidas = [cto.strip().upper() for cto in cto_invalidas.splitlines() if cto.strip()]
-        df["NOME ANTIGO CTO"] = df["NOME ANTIGO CTO"].astype(str).str.upper()
+        df["cto"] = df["cto"].astype(str).str.upper()
 
         # Criar dicionário com total de portas por caminho
-        portas_por_caminho = df.groupby("CAMINHO_REDE")["PORTAS"].sum().to_dict()
+        portas_por_caminho = df.groupby("CAMINHO_REDE")["portas"].sum().to_dict()
 
         # CTOs inválidas (de entrada)
-        df_invalidas = df[df["NOME ANTIGO CTO"].isin(lista_ctos_invalidas)].copy()
+        df_invalidas = df[df["cto"].isin(lista_ctos_invalidas)].copy()
 
         # CTOs candidatas (8 portas e caminho com < 128 portas)
-        df_candidatas = df[(df["PORTAS"] == 8)].copy()
+        df_candidatas = df[(df["portas"] == 8)].copy()
         df_candidatas["TOTAL_PORTAS_CAMINHO"] = df_candidatas["CAMINHO_REDE"].map(portas_por_caminho)
         df_candidatas = df_candidatas[df_candidatas["TOTAL_PORTAS_CAMINHO"] < 128]
 
@@ -81,9 +81,9 @@ if st.button("🔍 Buscar CTOs Disponíveis em até 250m"):
                     proximas.append(row_cand)
 
         if proximas:
-            df_resultado = pd.DataFrame(proximas).drop_duplicates(subset=["NOME ANTIGO CTO"])
+            df_resultado = pd.DataFrame(proximas).drop_duplicates(subset=["cto"])
             st.success(f"✅ Foram encontradas {len(df_resultado)} CTOs disponíveis a até 250m das CTOs inválidas.")
-            cidade_filtro = st.selectbox("Filtrar por cidade (opcional):", options=["Todas"] + sorted(df_resultado["CIDADE"].unique().tolist()))
+            cidade_filtro = st.selectbox("Filtrar por cidade (opcional):", options=["Todas"] + sorted(df_resultado["cid_rede"].unique().tolist()))
             if cidade_filtro != "Todas":
                 df_resultado = df_resultado[df_resultado["CIDADE"] == cidade_filtro]
             st.dataframe(df_resultado)
