@@ -1,78 +1,50 @@
 import streamlit as st
 import pandas as pd
-import os
-from rapidfuzz import process, fuzz
+from rapidfuzz import process
 
-st.title("🏢 Buscador de MDUs")
+st.title("🏢 Buscar MDU (Prédio)")
 
-# Caminho da base de dados
-caminho_mdu = os.path.join("pages", "base_de_dados", "base_mdu.xlsx")
-caminho_cto = os.path.join("pages", "base_de_dados", "base.xlsx")  # base com CTOs ativas
+# Caminho da base
+caminho_base = "pages/base_de_dados/base_mdu.xlsx"
 
-# Carregar bases
+# Carregar a base
 try:
-    df_mdu = pd.read_excel(caminho_mdu)
-    df_cto = pd.read_excel(caminho_cto)
+    df_mdu = pd.read_excel(caminho_base)
 except FileNotFoundError:
-    st.warning("⚠️ Base de dados não encontrada. Por favor, envie na página principal.")
+    st.error("❌ A base de dados dos MDUs não foi encontrada.")
     st.stop()
 
-# Input de busca
-input_busca = st.text_input("🔍 Digite parte do endereço, nome do condomínio, SMAP ou ID SMAP").strip()
+# 🔎 Mostra as colunas carregadas da base
+st.write("🧾 Colunas disponíveis na planilha:")
+st.write(df_mdu.columns.tolist())
 
-def buscar_mdu_flexivel(valor):
-    """Busca aproximada nos campos relevantes da base de MDUs"""
-    colunas_chave = ["Endereço", "Nome do Condomínio Bloco", "Smap(Projetos)", "ID Smap"]
-    resultados = pd.DataFrame()
-    for col in colunas_chave:
-        similares = process.extract(
-            query=valor,
-            choices=df_mdu[col].astype(str).unique(),
-            scorer=fuzz.token_sort_ratio,
-            limit=10
-        )
-        encontrados = [item[0] for item in similares if item[1] >= 70]
-        filtrado = df_mdu[df_mdu[col].astype(str).isin(encontrados)]
-        resultados = pd.concat([resultados, filtrado], ignore_index=True)
-    return resultados.drop_duplicates()
+# Campos possíveis para busca
+colunas_busca = ["Endereço", "Smap(Projetos)", "ID Smap", "Nome do Condomínio Bloco"]
 
-# Processa busca
-if input_busca:
-    mdu_resultados = buscar_mdu_flexivel(input_busca)
+# Entrada do usuário
+input_busca = st.text_input("Digite o endereço, ID Smap ou nome do MDU:")
 
-    if mdu_resultados.empty:
-        st.error("Nenhum MDU encontrado com os critérios informados.")
+def buscar_mdu_flexivel(entrada):
+    resultados = []
+
+    for col in colunas_busca:
+        if col in df_mdu.columns:
+            matches = process.extract(entrada, choices=df_mdu[col].astype(str).unique(), limit=5, score_cutoff=70)
+            for match, score, _ in matches:
+                encontrados = df_mdu[df_mdu[col].astype(str) == match]
+                encontrados["Correspondência"] = f"{col} (score: {score})"
+                resultados.append(encontrados)
+
+    if resultados:
+        return pd.concat(resultados, ignore_index=True)
     else:
-        st.success(f"🔎 {len(mdu_resultados)} MDU(s) encontrados.")
-        for idx, row in mdu_resultados.iterrows():
-            nome = row["Nome do Condomínio Bloco"]
-            endereco = row["Endereço"]
-            smap = row["Smap(Projetos)"]
-            id_smap = row["ID Smap"]
+        return pd.DataFrame()
 
-            st.markdown(f"### 🏢 {nome or '(sem nome)'}")
-            st.markdown(f"📍 **Endereço:** {endereco}")
-            st.markdown(f"🆔 **SMAP:** {smap} | **ID SMAP:** {id_smap}")
-
-            # Filtra CTOs por endereço aproximado ou nome do condomínio
-            df_ctos_mdu = df_cto[
-                df_cto["cto"].notnull() &
-                (
-                    df_cto["cto"].str.contains(nome, case=False, na=False) |
-                    df_cto["cto"].str.contains(endereco, case=False, na=False)
-                )
-            ].copy()
-
-            if not df_ctos_mdu.empty:
-                st.markdown("✅ **MDU ADEQUADO**")
-                df_ctos_mdu["ocupadas"] = df_ctos_mdu["portas"] - df_ctos_mdu["portas"].where(df_ctos_mdu["portas"] < 128, 128)
-                df_ctos_mdu["livres"] = df_ctos_mdu["portas"] - df_ctos_mdu["ocupadas"]
-                df_ctos_mdu["saturacao (%)"] = round(100 * df_ctos_mdu["ocupadas"] / df_ctos_mdu["portas"], 1)
-
-                st.dataframe(df_ctos_mdu[["cto", "portas", "ocupadas", "livres", "saturacao (%)"]])
-            else:
-                # Verifica se foi projetado
-                if pd.notna(smap) or pd.notna(id_smap):
-                    st.warning("⚠️ **MDU PROJETADO MAS NÃO ADEQUADO** — ainda sem CTO ativa.")
-                else:
-                    st.error("❌ **MDU NÃO PROJETADO** — não há informações suficientes.")
+if input_busca:
+    with st.spinner("🔍 Buscando MDUs..."):
+        mdu_resultados = buscar_mdu_flexivel(input_busca)
+        if not mdu_resultados.empty:
+            st.success(f"✅ {len(mdu_resultados)} resultado(s) encontrado(s).")
+            st.dataframe(mdu_resultados)
+        else:
+            st.warning("⚠️ Nenhum MDU encontrado com os dados fornecidos.")
