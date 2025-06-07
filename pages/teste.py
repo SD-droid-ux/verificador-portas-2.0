@@ -8,7 +8,7 @@ st.set_page_config(page_title="CTOs Próximas e Disponíveis", layout="wide")
 def carregar_dados():
     df = pd.read_excel("pages/base_de_dados/base.xlsx")
 
-    # Criar coluna CAMINHO_REDE com base em POP, CHASSI, PLACA, OLT
+    # Criar coluna CAMINHO_REDE com base em pop, olt, slot, pon
     df["CAMINHO_REDE"] = (
         df["pop"].astype(str) + "_" +
         df["olt"].astype(str) + "_" +
@@ -16,29 +16,15 @@ def carregar_dados():
         df["pon"].astype(str)
     )
 
-    # Converter LAT e LONG para numérico, valores inválidos virarão NaN
-    df["LAT"] = pd.to_numeric(df["LAT"], errors="coerce")
-    df["LONG"] = pd.to_numeric(df["LONG"], errors="coerce")
+    df["latitude"] = pd.to_numeric(df["latitude"], errors="coerce")
+    df["longitude"] = pd.to_numeric(df["longitude"], errors="coerce")
 
-    # Remover linhas com NaN em LAT ou LONG
-    df = df.dropna(subset=["LAT", "LONG"])
-
-    # Remover latitudes fora do intervalo válido [-90, 90]
-    df = df[(df["LAT"] >= -90) & (df["LAT"] <= 90)]
-
-    # Remover longitudes fora do intervalo válido [-180, 180]
-    df = df[(df["LONG"] >= -180) & (df["LONG"] <= 180)]
+    # Remove linhas com latitude ou longitude inválidas
+    df = df.dropna(subset=["latitude", "longitude"])
 
     return df
 
 df = carregar_dados()
-
-# Mostrar possíveis dados inválidos para debug (pode remover depois)
-df_invalid_lat = df[(df["LAT"] < -90) | (df["LAT"] > 90)]
-df_invalid_long = df[(df["LONG"] < -180) | (df["LONG"] > 180)]
-
-if not df_invalid_lat.empty or not df_invalid_long.empty:
-    st.warning("⚠️ Existem dados com coordenadas inválidas que foram removidos.")
 
 st.title("📍 Buscar CTOs Próximas e Disponíveis")
 
@@ -59,33 +45,30 @@ if st.button("🔍 Buscar CTOs Disponíveis em até 250m"):
         df_invalidas = df[df["cto"].isin(lista_ctos_invalidas)].copy()
 
         # CTOs candidatas (8 portas e caminho com < 128 portas)
-        df_candidatas = df[(df["portas"] == 8)].copy()
+        df_candidatas = df[df["portas"] == 8].copy()
         df_candidatas["TOTAL_PORTAS_CAMINHO"] = df_candidatas["CAMINHO_REDE"].map(portas_por_caminho)
         df_candidatas = df_candidatas[df_candidatas["TOTAL_PORTAS_CAMINHO"] < 128]
 
+        # Lista para armazenar CTOs próximas
         proximas = []
 
         for _, row_inv in df_invalidas.iterrows():
-            lat_inv, long_inv = row_inv["LAT"], row_inv["LONG"]
+            lat_inv, long_inv = row_inv["latitude"], row_inv["longitude"]
             for _, row_cand in df_candidatas.iterrows():
-                lat_cand, long_cand = row_cand["LAT"], row_cand["LONG"]
-
-                # Se alguma coordenada for inválida, ignora (proteção extra)
-                if not (-90 <= lat_inv <= 90 and -180 <= long_inv <= 180):
+                lat_cand, long_cand = row_cand["latitude"], row_cand["longitude"]
+                try:
+                    distancia = geodesic((lat_inv, long_inv), (lat_cand, long_cand)).meters
+                    if distancia <= 250:
+                        proximas.append(row_cand)
+                except ValueError:
                     continue
-                if not (-90 <= lat_cand <= 90 and -180 <= long_cand <= 180):
-                    continue
-
-                distancia = geodesic((lat_inv, long_inv), (lat_cand, long_cand)).meters
-                if distancia <= 250:
-                    proximas.append(row_cand)
 
         if proximas:
             df_resultado = pd.DataFrame(proximas).drop_duplicates(subset=["cto"])
             st.success(f"✅ Foram encontradas {len(df_resultado)} CTOs disponíveis a até 250m das CTOs inválidas.")
             cidade_filtro = st.selectbox("Filtrar por cidade (opcional):", options=["Todas"] + sorted(df_resultado["cid_rede"].unique().tolist()))
             if cidade_filtro != "Todas":
-                df_resultado = df_resultado[df_resultado["CIDADE"] == cidade_filtro]
+                df_resultado = df_resultado[df_resultado["cid_rede"] == cidade_filtro]
             st.dataframe(df_resultado)
         else:
             st.info("Nenhuma CTO com 8 portas e caminho < 128 encontrada a até 250m das CTOs inválidas.")
