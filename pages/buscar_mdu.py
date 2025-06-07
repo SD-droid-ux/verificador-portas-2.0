@@ -14,10 +14,6 @@ except FileNotFoundError:
     st.error("❌ A base de dados dos MDUs não foi encontrada.")
     st.stop()
 
-# 🔎 Mostra as colunas carregadas da base
-st.write("🧾 Colunas disponíveis na planilha:")
-st.write(df_mdu.columns.tolist())
-
 # Campos possíveis para busca
 colunas_busca = ["Endereço", "Smap(Projetos)", "ID Smap", "Nome do Condomínio Bloco"]
 
