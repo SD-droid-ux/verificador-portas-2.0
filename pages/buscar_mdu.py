@@ -1,39 +1,54 @@
 import streamlit as st
 import pandas as pd
+import os
 from rapidfuzz import process
 import unicodedata
 import re
 
-st.title("🏢 Buscar MDU (Prédio)")
+st.title("🏢 Buscar MDU (Prédios)")
 
-# Carregar base
-caminho_base = "pages/base_de_dados/base_mdu.xlsx"
-try:
-    df_mdu = pd.read_excel(caminho_base)
-except FileNotFoundError:
-    st.error("❌ A base de dados dos MDUs não foi encontrada.")
-    st.stop()
+# Caminho para a base de dados de MDUs
+caminho_mdu = os.path.join("pages", "base_de_dados", "base_mdu.xlsx")
 
-# Lista de colunas para busca
-colunas_busca = ["Endereço", "Smap(Projetos)", "ID Smap", "Nome do Condomínio Bloco"]
+# Carregamento da base com cache
+@st.cache_data
+def carregar_base_mdu(caminho):
+    try:
+        df = pd.read_excel(caminho)
+        df.columns = df.columns.str.strip()  # Remove espaços em branco
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar a base de dados: {e}")
+        return pd.DataFrame()
 
-# Função de limpeza e normalização
+# Função de limpeza de texto
 def limpar_texto(texto):
     if pd.isna(texto):
         return ""
-    texto = str(texto).strip().lower()
-    texto = re.sub(r"\s+", " ", texto)  # remove espaços extras
-    texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("utf-8")  # remove acentos
-    return texto
+    texto = str(texto).lower()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = texto.encode("ascii", "ignore").decode("utf-8")
+    texto = re.sub(r"[^\w\s]", "", texto)
+    return texto.strip()
 
-# Criar versões limpas das colunas de busca
+# Carrega a base
+df_mdu = carregar_base_mdu(caminho_mdu)
+
+if df_mdu.empty:
+    st.stop()
+
+# Define as colunas que serão usadas para busca
+colunas_busca = ["Endereço", "Smap(Projetos)", "ID Smap", "Nome do Condomínio Bloco"]
+
+# Cria colunas auxiliares limpas para busca
 for col in colunas_busca:
     if col in df_mdu.columns:
-        df_mdu[f"{col}_limpo"] = df_mdu[col].apply(limpar_texto)
+        df_mdu[f"{col}_limpo"] = df_mdu[col].astype(str).apply(limpar_texto)
 
-# Entrada do usuário
-input_busca = st.text_input("Digite o endereço, ID Smap ou nome do MDU:")
+# Campo de busca
+input_busca = st.text_input("🔍 Digite o nome, endereço, ID Smap ou Smap do MDU:")
 
+# Função de busca flexível
 def buscar_mdu_flexivel(entrada):
     entrada_limpa = limpar_texto(entrada)
     resultados = []
@@ -44,21 +59,27 @@ def buscar_mdu_flexivel(entrada):
             lista_opcoes = df_mdu[col_limpo].unique()
             matches = process.extract(entrada_limpa, lista_opcoes, limit=15, score_cutoff=60)
             for match, score, _ in matches:
-                encontrados = df_mdu[df_mdu[col_limpo] == match]
-                encontrados["Correspondência"] = f"{col} (score: {score})"
+                encontrados = df_mdu[df_mdu[col_limpo] == match].copy()
+                encontrados["Correspondência"] = col
+                encontrados["Score"] = score
                 resultados.append(encontrados)
 
     if resultados:
-        return pd.concat(resultados, ignore_index=True)
+        df_resultado = pd.concat(resultados, ignore_index=True)
+        df_resultado = df_resultado.sort_values(by="Score", ascending=False)
+        return df_resultado
     else:
         return pd.DataFrame()
 
-# Executar busca
-if input_busca:
-    with st.spinner("🔍 Buscando MDUs..."):
-        resultados = buscar_mdu_flexivel(input_busca)
-        if not resultados.empty:
-            st.success(f"✅ {len(resultados)} resultado(s) encontrado(s).")
-            st.dataframe(resultados)
-        else:
-            st.warning("⚠️ Nenhum MDU encontrado com os dados fornecidos.")
+# Botão de buscar
+if st.button("🔎 Buscar MDU"):
+    if not input_busca.strip():
+        st.warning("⚠️ Digite algo para buscar.")
+    else:
+        with st.spinner("Buscando MDU..."):
+            mdu_resultados = buscar_mdu_flexivel(input_busca)
+            if mdu_resultados.empty:
+                st.info("Nenhum MDU encontrado com base nos critérios fornecidos.")
+            else:
+                st.success(f"🔎 {len(mdu_resultados)} resultado(s) encontrado(s):")
+                st.dataframe(mdu_resultados)
