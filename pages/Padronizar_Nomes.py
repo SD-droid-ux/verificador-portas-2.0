@@ -1,57 +1,47 @@
 import streamlit as st
 import pandas as pd
-import re
 from io import BytesIO
 
-st.title("🔧 Padronizar Nome das CTOs")
+st.title("🔍 Buscar Nome Antigo e Novo das CTOs")
 
-uploaded_file = st.file_uploader("📤 Envie a planilha com os dados (POP e CTO)", type=["xlsx"])
+# Upload da base de correspondências
+arquivo_corrigidos = st.file_uploader("📁 Envie a base 'base_nomes_corrigidos.xlsx'", type=["xlsx"])
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
+# Caixa de texto para inserir manualmente os nomes das CTOs
+entrada = st.text_area("✍️ Insira os nomes das CTOs (uma por linha)", height=200)
+lista_ctos = [cto.strip().upper() for cto in entrada.split("\n") if cto.strip()]
 
-    # Verificação de colunas obrigatórias
-    if 'pop' not in df.columns or 'cto' not in df.columns:
-        st.error("A planilha deve conter as colunas: 'pop' e 'cto'")
-        st.stop()
+# Função para converter para Excel
+def converter_para_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Consulta CTO')
+    return output.getvalue()
 
-    def corrigir_nome_cto(pop, cto):
-        # Regra 1: mudar 'FOR' para 'FLA'
-        if pop.startswith("FOR"):
-            pop_corrigido = pop.replace("FOR", "FLA", 1)
-        else:
-            pop_corrigido = pop
+if arquivo_corrigidos and lista_ctos:
+    # Carrega e normaliza a base
+    df_corrigidos = pd.read_excel(arquivo_corrigidos)
+    df_corrigidos["cto_antigo"] = df_corrigidos["cto_antigo"].astype(str).str.strip().str.upper()
+    df_corrigidos["cto_novo"] = df_corrigidos["cto_novo"].astype(str).str.strip().str.upper()
 
-        # Extrair final numérico da CTO (último grupo de dígitos)
-        match = re.search(r'(\d{2,3})$', cto)
-        if not match:
-            return f"{pop_corrigido}-{cto}"  # fallback, sem alteração numérica
-        numero = match.group(1)
+    # Filtra por correspondência direta
+    df_resultado = df_corrigidos[
+        df_corrigidos["cto_antigo"].isin(lista_ctos) | df_corrigidos["cto_novo"].isin(lista_ctos)
+    ].copy()
 
-        cto_corrigido = f"{pop_corrigido}-{numero}"
+    if df_resultado.empty:
+        st.warning("❌ Nenhuma correspondência encontrada.")
+    else:
+        st.success(f"✅ {len(df_resultado)} correspondência(s) encontrada(s).")
+        st.dataframe(df_resultado)
 
-        # Regra 3: se o nome já estiver correto, mantém
-        if cto_corrigido == cto:
-            return cto
-
-        return cto_corrigido
-
-    df["cto_corrigida"] = df.apply(lambda row: corrigir_nome_cto(str(row["pop"]).strip(), str(row["cto"]).strip()), axis=1)
-
-    st.success("✅ CTOs corrigidas com sucesso!")
-    st.dataframe(df)
-
-    # Download do arquivo corrigido
-    def converter_para_excel(df):
-        buffer = BytesIO()
-        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name="CTOs Corrigidas")
-        buffer.seek(0)
-        return buffer
-
-    st.download_button(
-        label="📥 Baixar Excel com CTOs Corrigidas",
-        data=converter_para_excel(df),
-        file_name="ctos_corrigidas.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+        st.download_button(
+            label="⬇️ Baixar resultado em Excel",
+            data=converter_para_excel(df_resultado),
+            file_name="consulta_cto_nomes.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+elif not arquivo_corrigidos:
+    st.info("⚠️ Por favor, envie a base 'base_nomes_corrigidos.xlsx'.")
+elif not lista_ctos:
+    st.info("⚠️ Insira ao menos um nome de CTO para buscar.")
