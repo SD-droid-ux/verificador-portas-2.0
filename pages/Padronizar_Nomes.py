@@ -5,7 +5,7 @@ import os
 st.title("🔁 Buscar Nome Novo ou Antigo da CTO")
 
 # Caminho fixo do arquivo
-caminho_base = os.path.join("pages", "base_nomes_corrigidos.xlsx")
+caminho_base = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
 
 try:
     # Carrega a base corrigida
