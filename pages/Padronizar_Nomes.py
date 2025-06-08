@@ -44,7 +44,7 @@ if uploaded_file:
     # Download do arquivo corrigido
     def converter_para_excel(df):
         buffer = BytesIO()
-        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
             df.to_excel(writer, index=False, sheet_name="CTOs Corrigidas")
         buffer.seek(0)
         return buffer
