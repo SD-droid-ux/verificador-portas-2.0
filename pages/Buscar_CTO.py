@@ -33,14 +33,11 @@ portas_por_caminho = st.session_state["portas_por_caminho"]
 estados_disponiveis = df["estado"].dropna().unique()
 estado_selecionado = st.selectbox("🗺️ Selecione o estado:", sorted(estados_disponiveis))
 
+# Filtro por POP (nodo) para todos os estados
 df_estado = df[df["estado"] == estado_selecionado].copy()
-
-# Se for RN ou CE, exige filtro adicional por POP
-pop_filtrado = None
-if estado_selecionado in ["RN", "CE"]:
-    pops_disponiveis = df_estado["pop"].dropna().unique()
-    pop_filtrado = st.selectbox("🏢 Selecione o POP:", sorted(pops_disponiveis))
-    df_estado = df_estado[df_estado["pop"] == pop_filtrado]
+pops_disponiveis = df_estado["pop"].dropna().unique()
+pop_selecionado = st.selectbox("🏢 Selecione o POP (nodo):", sorted(pops_disponiveis))
+df_estado = df_estado[df_estado["pop"] == pop_selecionado]
 
 # Pré-processamento
 df_estado["cto_norm"] = df_estado["cto"].apply(normalizar)
@@ -111,16 +108,7 @@ if st.button("🔍 Buscar CTOs"):
                     )
 
                 st.success(f"✅ {len(df_resultado)} resultado(s) encontrados com correspondência.")
-
-                # Filtro por POP após resultado (para SP, MG etc.)
-                if estado_selecionado not in ["RN", "CE"]:
-                    pops_result = df_resultado["pop"].dropna().unique()
-                    pop_pos_busca = st.selectbox("📍 Filtrar por POP (opcional):", options=["Todos"] + sorted(pops_result.tolist()))
-                    if pop_pos_busca != "Todos":
-                        df_resultado = df_resultado[df_resultado["pop"] == pop_pos_busca]
-
                 st.dataframe(df_resultado)
-
             else:
                 st.info("🔍 Nenhuma CTO encontrada com correspondência aceitável.")
 
