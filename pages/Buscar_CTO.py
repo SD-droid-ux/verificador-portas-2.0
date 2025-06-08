@@ -4,7 +4,7 @@ import pandas as pd
 import os
 from rapidfuzz import process
 
-st.title("🔍 Buscar por CTO com Filtros Inteligentes")
+st.title("🔍 Buscar por CTO")
 
 # Caminho da base de dados
 caminho_base = os.path.join("pages", "base_de_dados", "base.xlsx")
