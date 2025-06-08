@@ -5,7 +5,7 @@ import os
 st.title("🔁 Conversor de CTO Antiga para Nova")
 
 # Caminho do arquivo
-caminho_base = os.path.join("pages", "base_nomes_corrigidos.xlsx")
+caminho_base = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
 
 # Carrega a base de dados
 try:
