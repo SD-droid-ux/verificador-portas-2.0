@@ -1,49 +1,45 @@
 import streamlit as st
 import pandas as pd
 import os
+from io import BytesIO
 
-st.title("🔄 Ver Nome Antigo e Novo da CTO")
+st.title("🔗 Unir POP e CTO")
 
-# Caminho fixo para a base
-caminho_base = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
+uploaded_file = st.file_uploader("📂 Envie a planilha com colunas 'pop' e 'cto'", type=["xlsx"])
 
-# Tenta carregar a base
-try:
-    df_base = pd.read_excel(caminho_base)
+def extrair_final_cto(cto):
+    if pd.isna(cto):
+        return ""
+    cto = str(cto).strip()
+    if '-' in cto:
+        return cto.split('-')[-1].zfill(3)  # Garante sempre 3 dígitos
+    return cto.zfill(3)
 
-    # Padroniza colunas
-    df_base["cto_antigo"] = df_base["cto_antigo"].astype(str).str.strip().str.upper()
-    df_base["cto_novo"] = df_base["cto_novo"].astype(str).str.strip().str.upper()
+def gerar_excel(df):
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='CTO Unificadas')
+    output.seek(0)
+    return output
 
-    # Entrada manual das CTOs
-    entrada = st.text_area("✍️ Insira os nomes das CTOs (uma por linha):", height=200)
-    lista_ctos = [cto.strip().upper() for cto in entrada.split('\n') if cto.strip()]
+if uploaded_file:
+    df = pd.read_excel(uploaded_file)
 
-    if lista_ctos:
-        resultados = []
-
-        for cto in lista_ctos:
-            filtro = df_base[(df_base["cto_antigo"] == cto) | (df_base["cto_novo"] == cto)]
-            if not filtro.empty:
-                for _, linha in filtro.iterrows():
-                    resultados.append({
-                        "CTO digitada": cto,
-                        "Nome Antigo": linha["cto_antigo"],
-                        "Nome Novo": linha["cto_novo"]
-                    })
-            else:
-                resultados.append({
-                    "CTO digitada": cto,
-                    "Nome Antigo": "❌ Não encontrado",
-                    "Nome Novo": "❌ Não encontrado"
-                })
-
-        df_resultado = pd.DataFrame(resultados)
-        st.success(f"🔍 Foram encontradas {len(df_resultado)} correspondência(s).")
-        st.dataframe(df_resultado)
-
+    # Validação das colunas
+    if 'pop' not in df.columns or 'cto' not in df.columns:
+        st.error("❌ A planilha precisa ter as colunas 'pop' e 'cto'.")
     else:
-        st.info("⚠️ Digite ao menos uma CTO para buscar.")
+        # Processamento
+        df['pop'] = df['pop'].astype(str).str.strip().str.upper()
+        df['cto'] = df['cto'].astype(str).str.strip().str.upper()
+        df['cto_final'] = df.apply(lambda row: f"{row['pop']}-{extrair_final_cto(row['cto'])}", axis=1)
 
-except FileNotFoundError:
-    st.error("❌ A base 'base_nomes_corrigidos.xlsx' não foi encontrada no caminho esperado.")
+        st.success("✅ Coluna unificada criada com sucesso!")
+        st.dataframe(df[['pop', 'cto', 'cto_final']])
+
+        st.download_button(
+            label="📥 Baixar planilha com CTOs unificadas",
+            data=gerar_excel(df),
+            file_name="ctos_unificadas.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
