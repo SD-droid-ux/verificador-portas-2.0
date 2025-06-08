@@ -1,48 +1,30 @@
 import streamlit as st
 import pandas as pd
 import os
-from io import BytesIO
-import re
 
-st.title("🔗 Unir POP e CTO — com tratamento para nomes já padronizados")
+st.title("🔁 Conversor de CTO Antiga para Nova")
 
-uploaded_file = st.file_uploader("📂 Envie a planilha com colunas 'pop' e 'cto'", type=["xlsx"])
+# Caminho do arquivo
+caminho_base = os.path.join("pages", "base_nomes_corrigidos.xlsx")
 
-def extrair_final_cto(row):
-    pop = str(row['pop']).strip().upper()
-    cto = str(row['cto']).strip().upper()
+# Carrega a base de dados
+try:
+    df = pd.read_excel(caminho_base)
+    df['cto_antigo'] = df['cto_antigo'].astype(str).str.strip().str.upper()
+    df['cto_novo'] = df['cto_novo'].astype(str).str.strip().str.upper()
+except Exception as e:
+    st.error(f"Erro ao carregar a base: {e}")
+    st.stop()
 
-    # Verifica se já está no formato correto: POP-nnn
-    if re.fullmatch(f"{pop}-\\d+", cto):
-        return cto  # já padronizado, mantém
-    # Caso contrário, extrai o final após o traço e padroniza
-    final = cto.split('-')[-1].zfill(3)
-    return f"{pop}-{final}"
+# Entrada do usuário
+cto_input = st.text_input("Digite o nome antigo da CTO:")
 
-def gerar_excel(df):
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='CTO Unificadas')
-    output.seek(0)
-    return output
+if cto_input:
+    cto_input = cto_input.strip().upper()
+    resultado = df[df['cto_antigo'] == cto_input]
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-
-    # Validação das colunas
-    if 'pop' not in df.columns or 'cto' not in df.columns:
-        st.error("❌ A planilha precisa ter as colunas 'pop' e 'cto'.")
+    if not resultado.empty:
+        nome_novo = resultado['cto_novo'].values[0]
+        st.success(f"✅ Nome novo correspondente: `{nome_novo}`")
     else:
-        df['pop'] = df['pop'].astype(str).str.strip().str.upper()
-        df['cto'] = df['cto'].astype(str).str.strip().str.upper()
-        df['cto_final'] = df.apply(extrair_final_cto, axis=1)
-
-        st.success("✅ Coluna unificada criada com sucesso!")
-        st.dataframe(df[['pop', 'cto', 'cto_final']])
-
-        st.download_button(
-            label="📥 Baixar planilha com CTOs unificadas",
-            data=gerar_excel(df),
-            file_name="ctos_unificadas.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        st.warning("❌ CTO não encontrada na base de dados.")
