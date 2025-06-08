@@ -21,7 +21,7 @@ def extrair_final_cto(row):
 
 def gerar_excel(df):
     output = BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='CTO Unificadas')
     output.seek(0)
     return output
