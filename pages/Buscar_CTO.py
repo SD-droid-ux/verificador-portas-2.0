@@ -3,7 +3,7 @@ import pandas as pd
 import os
 from rapidfuzz import fuzz, process
 
-st.title("🔍 Buscar por CTO (Nome antigo ou novo)")
+st.title("🔍 Buscar por CTO")
 
 # Caminhos das bases
 caminho_base = os.path.join("pages", "base_de_dados", "base.xlsx")
