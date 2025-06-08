@@ -2,14 +2,14 @@ import streamlit as st
 import time
 import pandas as pd
 import os
-from rapidfuzz import process, fuzz
+from rapidfuzz import process
 
-st.title("🔍 Buscar por CTO")
+st.title("🔍 Buscar por CTO com Filtros Inteligentes")
 
 # Caminho da base de dados
 caminho_base = os.path.join("pages", "base_de_dados", "base.xlsx")
 
-# Carrega os dados na sessão
+# Carrega a base no session_state, se necessário
 if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
     try:
         df = pd.read_excel(caminho_base)
@@ -18,98 +18,80 @@ if "df" not in st.session_state or "portas_por_caminho" not in st.session_state:
         st.session_state["df"] = df
         st.session_state["portas_por_caminho"] = portas_por_caminho
     except FileNotFoundError:
-        st.warning("⚠️ A base de dados não foi encontrada. Por favor, envie na página principal.")
+        st.warning("⚠️ A base de dados não foi encontrada.")
         st.stop()
 
-# Função de normalização
-def normalizar(texto):
-    return str(texto).upper().strip().replace("-", "").replace("_", "").replace(" ", "")
-
-# Dados da sessão
+# Recupera do session_state
 df = st.session_state["df"]
 portas_por_caminho = st.session_state["portas_por_caminho"]
 
 # Filtro por estado
-estados_disponiveis = df["estado"].dropna().unique()
-estado_selecionado = st.selectbox("🗺️ Selecione o estado:", sorted(estados_disponiveis))
+todos_estados = st.checkbox("🔄 Buscar em TODOS os Estados", value=False)
 
-# Filtro por POP (nodo) para todos os estados
-df_estado = df[df["estado"] == estado_selecionado].copy()
-pops_disponiveis = df_estado["pop"].dropna().unique()
-pop_selecionado = st.selectbox("🏢 Selecione o POP (nodo):", sorted(pops_disponiveis))
-df_estado = df_estado[df_estado["pop"] == pop_selecionado]
+if todos_estados:
+    df_filtrado_estado = df.copy()
+else:
+    estado_selecionado = st.selectbox("📍 Selecione o Estado", sorted(df["estado"].dropna().unique()))
+    df_filtrado_estado = df[df["estado"] == estado_selecionado]
 
-# Pré-processamento
-df_estado["cto_norm"] = df_estado["cto"].apply(normalizar)
+# Filtro por POP
+todos_pops = st.checkbox("🔄 Buscar em TODOS os POPs do estado selecionado", value=False)
 
-# Entrada das CTOs
-input_ctos = list(dict.fromkeys(st.text_area("✏️ Insira os ID das CTOs (uma por linha)").splitlines()))
+if todos_pops:
+    df_filtrado = df_filtrado_estado.copy()
+else:
+    pops_disponiveis = sorted(df_filtrado_estado["pop"].dropna().unique())
+    pop_selecionado = st.selectbox("📡 Selecione o POP", pops_disponiveis)
+    df_filtrado = df_filtrado_estado[df_filtrado_estado["pop"] == pop_selecionado]
+
+# Entrada de CTOs
+input_ctos = list(dict.fromkeys(st.text_area("✏️ Insira os ID das CTOs (uma por linha)").upper().splitlines()))
+
+def buscar_com_correspondencia(cto_input, lista_ctos_base, limite=80):
+    correspondencias = process.extract(
+        query=cto_input,
+        choices=lista_ctos_base,
+        score_cutoff=limite,
+        limit=5
+    )
+    return correspondencias
 
 if st.button("🔍 Buscar CTOs"):
     if not input_ctos or all(not cto.strip() for cto in input_ctos):
-        st.warning("⚠️ Insira pelo menos um ID de CTO para buscar.")
+        st.warning("⚠️ Insira pelo menos um ID de CTO.")
     else:
-        with st.spinner("🔄 Analisando CTOs..."):
-            progress_bar = st.progress(0)
-            for i in range(5):
-                time.sleep(0.1)
-                progress_bar.progress((i + 1) * 20)
-
+        with st.spinner("🔄 Buscando correspondências..."):
             resultados_finais = []
 
-            for cto_input in input_ctos:
-                cto_input_norm = normalizar(cto_input)
+            lista_ctos_base = df_filtrado["cto"].dropna().astype(str).str.upper().unique().tolist()
 
-                melhores = process.extract(
-                    cto_input_norm,
-                    df_estado["cto_norm"].unique(),
-                    scorer=fuzz.WRatio,
-                    limit=1
-                )
+            for cto in input_ctos:
+                correspondencias = buscar_com_correspondencia(cto, lista_ctos_base)
+                for cto_encontrada, score, _ in correspondencias:
+                    dados_cto = df_filtrado[df_filtrado["cto"].str.upper() == cto_encontrada].copy()
+                    dados_cto["SCORE"] = score
+                    resultados_finais.append(dados_cto)
 
-                if melhores and melhores[0][1] > 65:
-                    cto_norm_encontrado = melhores[0][0]
-                    match_df = df_estado[df_estado["cto_norm"] == cto_norm_encontrado].copy()
-                    match_df["cto_busca"] = cto_input
-                    match_df["cto_sugerido"] = match_df["cto"]
-                    match_df["score_correspondencia"] = melhores[0][1]
-                    resultados_finais.append(match_df)
-                else:
-                    linha_nao_encontrada = pd.DataFrame([{
-                        "cto_busca": cto_input,
-                        "cto_sugerido": "❌ Nenhuma correspondência aceitável",
-                        "score_correspondencia": 0,
-                    }])
-                    resultados_finais.append(linha_nao_encontrada)
-
-            if resultados_finais:
-                df_resultado = pd.concat(resultados_finais, ignore_index=True)
-                df_resultado = df_resultado.sort_values(by="score_correspondencia", ascending=False)
-
-                if "CAMINHO_REDE" in df_resultado.columns and "portas" in df_resultado.columns:
-                    def obter_status(row):
-                        total = portas_por_caminho.get(row.get("CAMINHO_REDE", ""), 0)
-                        if total > 128:
-                            return "🔴 SATURADO"
-                        elif total == 128 and row["portas"] == 16:
-                            return "🔴 SATURADO"
-                        elif total == 128 and row["portas"] == 8:
-                            return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
-                        elif row["portas"] == 16 and total < 128:
-                            return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
-                        elif row["portas"] == 8 and total < 128:
-                            return "✅ TROCA DE SP8 PARA SP16"
-                        else:
-                            return "⚪ STATUS INDEFINIDO"
-
-                    df_resultado["STATUS"] = df_resultado.apply(
-                        lambda row: obter_status(row) if "portas" in row and pd.notna(row.get("CAMINHO_REDE", None)) else "N/A",
-                        axis=1
-                    )
-
-                st.success(f"✅ {len(df_resultado)} resultado(s) encontrados com correspondência.")
-                st.dataframe(df_resultado)
+            if not resultados_finais:
+                st.info("Nenhuma correspondência encontrada.")
             else:
-                st.info("🔍 Nenhuma CTO encontrada com correspondência aceitável.")
+                df_resultado = pd.concat(resultados_finais).drop_duplicates().sort_values(by="SCORE", ascending=False)
 
-        progress_bar.empty()
+                def obter_status(row):
+                    total = portas_por_caminho.get(row["CAMINHO_REDE"], 0)
+                    if total > 128:
+                        return "🔴 SATURADO"
+                    elif total == 128 and row["portas"] == 16:
+                        return "🔴 SATURADO"
+                    elif total == 128 and row["portas"] == 8:
+                        return "🔴 CTO É SP8 MAS PON JÁ ESTÁ SATURADA"
+                    elif row["portas"] == 16 and total < 128:
+                        return "✅ CTO JÁ É SP16 MAS A PON NÃO ESTÁ SATURADA"
+                    elif row["portas"] == 8 and total < 128:
+                        return "✅ TROCA DE SP8 PARA SP16"
+                    else:
+                        return "⚪ STATUS INDEFINIDO"
+
+                df_resultado["STATUS"] = df_resultado.apply(obter_status, axis=1)
+                st.success(f"✅ {len(df_resultado)} correspondência(s) encontradas.")
+                st.dataframe(df_resultado)
