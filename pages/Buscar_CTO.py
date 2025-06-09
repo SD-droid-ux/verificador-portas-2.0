@@ -62,8 +62,8 @@ if st.button("🔍 Buscar CTOs"):
 
             # Verifica na base de nomes corrigidos
             linha_corrigida = df_corrigidos[
-                (df_corrigidos["nome_corrigido"].str.upper() == entrada)
-                | (df_corrigidos["nome_antigo"].str.upper() == entrada)
+                (df_corrigidos["cto_novo"].str.upper() == entrada)
+                | (df_corrigidos["cto_antigo"].str.upper() == entrada)
             ]
 
             if not linha_corrigida.empty:
