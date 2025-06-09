@@ -1,56 +1,63 @@
-import streamlit as st
-import pandas as pd
 import os
-
-st.set_page_config(page_title="Buscar CTO", page_icon="🔍")
-st.markdown("# 🔍 Buscar CTO")
-st.write("Digite o nome de uma CTO para verificar o nome corrigido e os dados da rede.")
+import pandas as pd
+import streamlit as st
 
 # Caminhos dos arquivos
 caminho_corrigido = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
 caminho_base_rede = os.path.join("pages", "base_de_dados", "base.xlsx")
 
-# Verificações
-if not os.path.exists(caminho_corrigido):
-    st.error("Arquivo com os nomes corrigidos não encontrado.")
-    st.stop()
+# Título da aba
+st.title("🔍 Buscar CTO")
 
-if not os.path.exists(caminho_base_rede):
-    st.error("Arquivo com a base de rede não encontrado.")
-    st.stop()
+# Entrada de texto para múltiplas CTOs
+input_ctos = st.text_area("Digite o(s) nome(s) da(s) CTO(s):", placeholder="Ex: FLA1234\nFLA5678")
 
-# Carregar bases
-df_corrigidos = pd.read_excel(caminho_corrigido)
-df_rede = pd.read_excel(caminho_base_rede)
-
-# Padronização
-df_corrigidos["cto_antigo"] = df_corrigidos["cto_antigo"].astype(str).str.strip().str.upper()
-df_corrigidos["cto_novo"] = df_corrigidos["cto_novo"].astype(str).str.strip().str.upper()
-df_rede["cto"] = df_rede["cto"].astype(str).str.strip().str.upper()
-
-# Entrada do usuário
-entrada_usuario = st.text_input("Nome da CTO")
-botao_buscar = st.button("🔍 Buscar")
-
-if botao_buscar and entrada_usuario:
-    entrada = entrada_usuario.strip().upper()
-    linha_corrigida = df_corrigidos[df_corrigidos["cto_novo"] == entrada]
-
-    if not linha_corrigida.empty:
-        cto_antigo = linha_corrigida.iloc[0]["cto_antigo"]
-        cto_novo = linha_corrigida.iloc[0]["cto_novo"]
-
-        st.success("CTO encontrada na base corrigida!")
-        st.write(f"🔄 Nome original: `{cto_antigo}`")
-        st.write(f"✅ Nome corrigido: `{cto_novo}`")
-
-        # Dados da rede
-        dados_rede = df_rede[df_rede["cto"] == cto_novo]
-
-        if not dados_rede.empty:
-            st.subheader("📡 Detalhes do Caminho de Rede:")
-            st.dataframe(dados_rede, use_container_width=True)
-        else:
-            st.warning("CTO corrigida encontrada, mas não foi localizada na base de rede.")
+# Botão de busca
+if st.button("🔎 Buscar"):
+    if not input_ctos.strip():
+        st.warning("Por favor, insira ao menos um nome de CTO.")
     else:
-        st.warning("CTO não encontrada na base de nomes corrigidos.")
+        # Processa entradas
+        lista_ctos = [cto.strip().upper() for cto in input_ctos.replace(",", "\n").splitlines() if cto.strip()]
+
+        # Carrega os dados
+        df_corrigidos = pd.read_excel(caminho_corrigido)
+        df_base = pd.read_excel(caminho_base_rede)
+
+        # Normaliza colunas
+        df_corrigidos["cto_antigo"] = df_corrigidos["cto_antigo"].astype(str).str.strip().str.upper()
+        df_corrigidos["cto_novo"] = df_corrigidos["cto_novo"].astype(str).str.strip().str.upper()
+        df_base["cto"] = df_base["cto"].astype(str).str.strip().str.upper()
+
+        resultados = []
+
+        for entrada in lista_ctos:
+            # Tenta encontrar nome novo com base na correção
+            linha_corrigida = df_corrigidos[
+                (df_corrigidos["cto_antigo"] == entrada) | (df_corrigidos["cto_novo"] == entrada)
+            ]
+
+            if not linha_corrigida.empty:
+                nome_corrigido = linha_corrigida.iloc[0]["cto_novo"]
+            else:
+                nome_corrigido = entrada
+
+            # Busca na base principal
+            linha_base = df_base[df_base["cto"] == nome_corrigido]
+
+            if not linha_base.empty:
+                resultados.append(linha_base)
+            else:
+                st.warning(f"❌ CTO '{entrada}' não encontrada na base.")
+
+        # Exibe resultados
+        if resultados:
+            df_resultado = pd.concat(resultados, ignore_index=True)
+            st.success(f"✅ {len(df_resultado)} CTO(s) encontrada(s):")
+            st.dataframe(df_resultado)
+
+            # Download CSV
+            csv = df_resultado.to_csv(index=False).encode("utf-8")
+            st.download_button("📥 Baixar resultado em CSV", data=csv, file_name="resultado_busca_cto.csv", mime="text/csv")
+        else:
+            st.info("Nenhuma CTO válida foi encontrada.")
