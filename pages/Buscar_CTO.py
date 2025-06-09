@@ -7,8 +7,8 @@ st.markdown("# 🔍 Buscar CTO")
 st.write("Digite o nome de uma CTO para verificar o nome corrigido e os dados da rede.")
 
 # Caminhos dos arquivos
-caminho_corrigido = os.path.join("data", "base_ctos_corrigidas.xlsx")
-caminho_base_rede = os.path.join("data", "base.xlsx")
+caminho_corrigido = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
+caminho_base_rede = os.path.join("pages", "base_de_dados", "base.xlsx")
 
 # Verificações
 if not os.path.exists(caminho_corrigido):
