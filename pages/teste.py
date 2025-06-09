@@ -62,15 +62,19 @@ if st.button("🔍 Buscar CTOs Disponíveis em até 200m"):
         # Busca de CTOs próximas
         for _, inv in df_invalidas.iterrows():
             coord_inv = (inv["latitude"], inv["longitude"])
+            nome_cto_inv = inv["cto"]
+    
             for _, cand in df_candidatas.iterrows():
                 coord_cand = (cand["latitude"], cand["longitude"])
                 distancia = geodesic(coord_inv, coord_cand).meters
                 if distancia <= 200:
-                    resultados.append(cand)
+                    cand_copy = cand.copy()
+                    cand_copy["possível_troca"] = f"{nome_cto_inv}  --->  {cand_copy['cto']}"
+                    resultados.append(cand_copy)
 
         if resultados:
             df_resultado = pd.DataFrame(resultados).drop_duplicates(subset=["cto"])
-            st.success(f"✅ Foram encontradas {len(df_resultado)} CTOs disponíveis a até 250m.")
+            st.success(f"✅ Foram encontradas {len(df_resultado)} CTOs disponíveis a até 200m.")
             cidade_filtro = st.selectbox("Filtrar por cidade (opcional):", ["Todas"] + sorted(df_resultado["cid_rede"].unique()))
             if cidade_filtro != "Todas":
                 df_resultado = df_resultado[df_resultado["cid_rede"] == cidade_filtro]
