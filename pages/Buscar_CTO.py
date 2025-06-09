@@ -3,38 +3,37 @@ import pandas as pd
 import os
 
 st.set_page_config(page_title="Buscar CTO", page_icon="🔍")
-
 st.markdown("# 🔍 Buscar CTO")
-st.write("Digite o nome de uma CTO para verificar seu nome corrigido (se aplicável).")
+st.write("Digite o nome de uma CTO para verificar o nome corrigido e os dados da rede.")
 
-# Caminho do arquivo corrigido
-caminho_corrigido = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
+# Caminhos dos arquivos
+caminho_corrigido = os.path.join("data", "base_ctos_corrigidas.xlsx")
+caminho_base_rede = os.path.join("data", "base.xlsx")
 
-# Verifica se o arquivo existe
+# Verificações
 if not os.path.exists(caminho_corrigido):
     st.error("Arquivo com os nomes corrigidos não encontrado.")
     st.stop()
 
-# Carrega o arquivo corrigido
-df_corrigidos = pd.read_excel(caminho_corrigido)
-
-# Garante que as colunas existam
-if "cto_antigo" not in df_corrigidos.columns or "cto_novo" not in df_corrigidos.columns:
-    st.error("A planilha deve conter as colunas 'cto_antigo' e 'cto_novo'.")
+if not os.path.exists(caminho_base_rede):
+    st.error("Arquivo com a base de rede não encontrado.")
     st.stop()
 
-# Converte para letras maiúsculas para evitar problemas de comparação
+# Carregar bases
+df_corrigidos = pd.read_excel(caminho_corrigido)
+df_rede = pd.read_excel(caminho_base_rede)
+
+# Padronização
 df_corrigidos["cto_antigo"] = df_corrigidos["cto_antigo"].astype(str).str.strip().str.upper()
 df_corrigidos["cto_novo"] = df_corrigidos["cto_novo"].astype(str).str.strip().str.upper()
+df_rede["cto"] = df_rede["cto"].astype(str).str.strip().str.upper()
 
-# Campo de entrada
+# Entrada do usuário
 entrada_usuario = st.text_input("Nome da CTO")
+botao_buscar = st.button("🔍 Buscar")
 
-# Processa quando o usuário digitar algo
-if entrada_usuario:
+if botao_buscar and entrada_usuario:
     entrada = entrada_usuario.strip().upper()
-
-    # Verifica se encontrou a CTO na base corrigida
     linha_corrigida = df_corrigidos[df_corrigidos["cto_novo"] == entrada]
 
     if not linha_corrigida.empty:
@@ -45,11 +44,13 @@ if entrada_usuario:
         st.write(f"🔄 Nome original: `{cto_antigo}`")
         st.write(f"✅ Nome corrigido: `{cto_novo}`")
 
-        # Exibir possível troca
-        df_resposta = pd.DataFrame({
-            "Possível Troca": [f"{cto_antigo} → {cto_novo}"]
-        })
-        st.dataframe(df_resposta, use_container_width=True)
+        # Dados da rede
+        dados_rede = df_rede[df_rede["cto"] == cto_novo]
 
+        if not dados_rede.empty:
+            st.subheader("📡 Detalhes do Caminho de Rede:")
+            st.dataframe(dados_rede, use_container_width=True)
+        else:
+            st.warning("CTO corrigida encontrada, mas não foi localizada na base de rede.")
     else:
         st.warning("CTO não encontrada na base de nomes corrigidos.")
