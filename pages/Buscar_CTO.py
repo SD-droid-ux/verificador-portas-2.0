@@ -8,39 +8,44 @@ caminho_base_rede = os.path.join("pages", "base_de_dados", "base.xlsx")
 
 st.title("🔍 Buscar CTO")
 
-# Carregamento dos dados
+# Carrega os dados com cache para acelerar performance
 @st.cache_data
 def carregar_dados():
     df_corrigidos = pd.read_excel(caminho_corrigido)
     df_base = pd.read_excel(caminho_base_rede)
-    df_base["cto"] = df_base["cto"].astype(str).str.upper().str.strip()
-    return df_corrigidos, df_base
 
-df_corrigidos, df_base = carregar_dados()
+    # Normaliza a coluna da base
+    df_base["cto"] = df_base["cto"].astype(str).str.strip().str.upper()
 
-# Criar dicionário com nomes novos e antigos
-dict_corrigidos = dict(zip(
-    df_corrigidos["cto_novo"].str.upper().str.strip(),
-    df_corrigidos["cto_antigo"].str.upper().str.strip()
-))
+    # Normaliza colunas da base de nomes corrigidos
+    df_corrigidos["cto_novo"] = df_corrigidos["cto_novo"].astype(str).str.strip().str.upper()
+    df_corrigidos["cto_antigo"] = df_corrigidos["cto_antigo"].astype(str).str.strip().str.upper()
+
+    # Cria dicionário para buscar nome antigo a partir do novo
+    dict_novos_para_antigos = dict(zip(df_corrigidos["cto_novo"], df_corrigidos["cto_antigo"]))
+
+    return df_base, dict_novos_para_antigos
+
+df_base, dict_novos_para_antigos = carregar_dados()
 
 # Entrada de CTO
-entrada = st.text_input("Insira o nome da CTO que deseja buscar:")
+entrada = st.text_input("Insira o nome da CTO (antigo ou novo):")
 
 if st.button("🔎 Iniciar busca") and entrada:
     entrada = entrada.strip().upper()
 
-    # 1. Tenta buscar diretamente na base
+    # Tenta buscar diretamente pela CTO
     resultado = df_base[df_base["cto"] == entrada]
 
-    # 2. Se não encontrar, busca pelo nome antigo
-    if resultado.empty and entrada in dict_corrigidos:
-        nome_antigo = dict_corrigidos[entrada]
-        resultado = df_base[df_base["cto"] == nome_antigo]
+    # Se não encontrou, tenta usar o nome antigo via base de correção
+    if resultado.empty:
+        nome_antigo = dict_novos_para_antigos.get(entrada)
+        if nome_antigo:
+            resultado = df_base[df_base["cto"] == nome_antigo]
 
-    # Exibe resultado
+    # Exibe resultados
     if not resultado.empty:
         st.success(f"{len(resultado)} resultado(s) encontrado(s):")
         st.dataframe(resultado)
     else:
-        st.warning("Nenhum resultado encontrado para a CTO informada.")
+        st.warning("Nenhuma informação encontrada para essa CTO.")
