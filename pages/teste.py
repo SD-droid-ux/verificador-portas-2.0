@@ -33,7 +33,7 @@ st.title("📍 Buscar CTOs Próximas e Disponíveis")
 # Entrada das CTOs inválidas
 cto_invalidas = st.text_area("Insira os nomes das CTOs que **NÃO podem ser trocadas** (uma por linha):")
 
-if st.button("🔍 Buscar CTOs Disponíveis em até 250m"):
+if st.button("🔍 Buscar CTOs Disponíveis em até 200m"):
     if not cto_invalidas.strip():
         st.warning("⚠️ Por favor, insira ao menos uma CTO inválida.")
     else:
