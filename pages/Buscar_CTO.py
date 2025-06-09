@@ -2,14 +2,14 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="Buscar CTO", layout="wide")
-
 # Caminhos dos arquivos
 caminho_corrigido = os.path.join("pages", "base_de_dados", "base_nomes_corrigidos.xlsx")
 caminho_base_rede = os.path.join("pages", "base_de_dados", "base.xlsx")
 
-# Cache das bases
-@st.cache_data(show_spinner=False)
+st.title("🔍 Buscar CTO na Base de Dados")
+
+# Carregamento dos dados com cache para performance
+@st.cache_data
 def carregar_dados():
     df_corrigidos = pd.read_excel(caminho_corrigido)
     df_base = pd.read_excel(caminho_base_rede)
@@ -17,48 +17,31 @@ def carregar_dados():
 
 df_corrigidos, df_base = carregar_dados()
 
-# Criar dicionário nome_corrigido -> nome_antigo para busca rápida
-dict_corrigidos = dict(zip(df_corrigidos["nome_corrigido"].str.upper().str.strip(),
-                           df_corrigidos["nome_antigo"].str.upper().str.strip()))
+# Criar dicionário para busca rápida dos nomes corrigidos
+dict_corrigidos = dict(zip(
+    df_corrigidos["cto_novo"].str.upper().str.strip(),
+    df_corrigidos["cto_antigo"].str.upper().str.strip()
+))
 
-st.title("🔎 Buscar Informações da CTO")
-st.write("Insira o nome de uma ou mais CTOs para obter os dados correspondentes.")
+# Entrada do usuário
+entrada = st.text_input("Digite o nome da CTO:", "").strip().upper()
 
-entrada_usuario = st.text_area("Digite os nomes das CTOs (uma por linha):")
-botao_buscar = st.button("Buscar CTOs")
+if st.button("🔍 Buscar CTO"):
+    if not entrada:
+        st.warning("Por favor, digite um nome de CTO para buscar.")
+    else:
+        df_base["cto"] = df_base["cto"].astype(str).str.upper().str.strip()
 
-if entrada_usuario and botao_buscar:
-    nomes_ctos = [cto.strip().upper() for cto in entrada_usuario.strip().split("\n") if cto.strip() != ""]
+        # 1. Buscar diretamente na base
+        resultado = df_base[df_base["cto"] == entrada]
 
-    resultados = []
+        # 2. Se não encontrar, buscar o nome antigo correspondente
+        if resultado.empty and entrada in dict_corrigidos:
+            cto_antiga = dict_corrigidos[entrada]
+            resultado = df_base[df_base["cto"] == cto_antiga]
 
-    for nome in nomes_ctos:
-        nome_final = nome
-
-        # Se não encontrar diretamente na base, tenta corrigir via dicionário
-        if nome not in df_base['cto'].str.upper().values:
-            if nome in dict_corrigidos:
-                nome_final = dict_corrigidos[nome]
-
-        dados_cto = df_base[df_base['cto'].str.upper() == nome_final]
-
-        if not dados_cto.empty:
-            resultados.append(dados_cto)
+        if not resultado.empty:
+            st.success(f"CTO encontrada ({len(resultado)} registro(s)):")
+            st.dataframe(resultado)
         else:
-            st.warning(f"⚠️ CTO '{nome}' não encontrada na base.")
-
-    if resultados:
-        df_resultado = pd.concat(resultados, ignore_index=True)
-        st.success(f"✅ {len(df_resultado)} CTO(s) encontrada(s).")
-        st.dataframe(df_resultado, use_container_width=True)
-
-        # Download do resultado
-        def gerar_excel():
-            from io import BytesIO
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                df_resultado.to_excel(writer, index=False, sheet_name='Resultado')
-            output.seek(0)
-            return output
-
-        st.download_button("📥 Baixar Resultado em Excel", gerar_excel(), file_name="resultado_busca_ctos.xlsx")
+            st.error("CTO não encontrada na base.")
