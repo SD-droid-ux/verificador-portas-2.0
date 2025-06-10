@@ -1,36 +1,30 @@
-import streamlit as st
 import pandas as pd
 
-st.title("🔗 Agrupador de Caminhos de Rede")
+# Leitura do Excel
+df = pd.read_excel("entrada.xlsx")
 
-# Upload da planilha com múltiplas CTOs
-uploaded_file = st.file_uploader("📥 Envie a planilha com múltiplas CTOs", type=["xlsx"])
+# Renomear colunas para padronizar
+df.columns = ['pop', 'olt', 'slot', 'pon', 'cto']
 
-if uploaded_file:
-    # Leitura e padronização da planilha
-    df = pd.read_excel(uploaded_file)
-    df.columns = df.columns.str.lower().str.strip()
+# Remover espaços extras e padronizar
+df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
-    # Verifica se colunas esperadas existem
-    caminho_cols = ['pop', 'olt', 'slot', 'pon']
-    if not all(col in df.columns for col in caminho_cols):
-        st.error(f"❌ A planilha precisa conter as colunas: {', '.join(caminho_cols)}")
-    else:
-        # Agrupar os caminhos de rede
-        st.subheader("🔍 Visualização por Caminho de Rede")
+# Extrair número da CTO
+df['numero_cto'] = df['cto'].str.extract(r'(\d+)$')
 
-        caminhos_unicos = df[caminho_cols].drop_duplicates()
+# Determinar número de portas com base na regra (se número <= 128 → 8 portas, senão → 16 portas)
+df['portas'] = df['numero_cto'].astype(int).apply(lambda x: 8 if x <= 128 else 16)
 
-        for _, row in caminhos_unicos.iterrows():
-            filtro = (df['pop'] == row['pop']) & \
-                     (df['olt'] == row['olt']) & \
-                     (df['slot'] == row['slot']) & \
-                     (df['pon'] == row['pon'])
+# Calcular o total de CTOs por agrupamento
+agrupado = df.groupby(['pop', 'olt', 'slot', 'pon']).agg(
+    total=('cto', 'count')
+).reset_index()
 
-            grupo = df[filtro]
-            st.markdown(f"### 🔸 Caminho: {row['pop']} / {row['olt']} / {row['slot']} / {row['pon']}")
-            st.dataframe(grupo)
+# Juntar os totais com o dataframe original
+df_final = pd.merge(df, agrupado, on=['pop', 'olt', 'slot', 'pon'])
 
-        # Botão para exportar agrupamento completo
-        csv = df.sort_values(by=caminho_cols).to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Baixar Agrupamento Completo", data=csv, file_name="agrupamento_caminhos.csv", mime="text/csv")
+# Selecionar e reordenar colunas para exportação
+df_final = df_final[['pop', 'olt', 'slot', 'pon', 'cto', 'portas', 'total']]
+
+# Exportar para Excel
+df_final.to_excel("saida_formatada.xlsx", index=False)
