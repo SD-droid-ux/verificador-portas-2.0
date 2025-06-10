@@ -1,30 +1,30 @@
 import pandas as pd
+import os
 
-# Leitura do Excel
-df = pd.read_excel("entrada.xlsx")
+# Caminho para a base original
+caminho_base = os.path.join("pages", "base_de_dados", "base.xlsx")
 
-# Renomear colunas para padronizar
-df.columns = ['pop', 'olt', 'slot', 'pon', 'cto']
+# Função principal
+def verificar_saturacao_portas(df_novas):
+    # 1. Agrupar portas novas por caminho de rede
+    df_novas['caminho_rede'] = df_novas[['pop', 'olt', 'slot', 'pon']].agg('/'.join, axis=1)
+    portas_novas = df_novas.groupby('caminho_rede')['portas'].sum().reset_index()
+    portas_novas.rename(columns={'portas': 'portas_novas'}, inplace=True)
 
-# Remover espaços extras e padronizar
-df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)
+    # 2. Carregar a base existente
+    df_base = pd.read_excel(caminho_base)
+    df_base['caminho_rede'] = df_base[['pop', 'olt', 'slot', 'pon']].agg('/'.join, axis=1)
+    portas_existentes = df_base.groupby('caminho_rede')['portas'].sum().reset_index()
+    portas_existentes.rename(columns={'portas': 'portas_existentes'}, inplace=True)
 
-# Extrair número da CTO
-df['numero_cto'] = df['cto'].str.extract(r'(\d+)$')
+    # 3. Juntar bases
+    df_total = pd.merge(portas_existentes, portas_novas, on='caminho_rede', how='outer').fillna(0)
+    df_total['portas_existentes'] = df_total['portas_existentes'].astype(int)
+    df_total['portas_novas'] = df_total['portas_novas'].astype(int)
 
-# Determinar número de portas com base na regra (se número <= 128 → 8 portas, senão → 16 portas)
-df['portas'] = df['numero_cto'].astype(int).apply(lambda x: 8 if x <= 128 else 16)
+    # 4. Calcular total final
+    df_total['total_final'] = df_total['portas_existentes'] + df_total['portas_novas']
+    df_total['status'] = df_total['total_final'].apply(lambda x: 'ULTRAPASSOU' if x > 128 else 'OK')
 
-# Calcular o total de CTOs por agrupamento
-agrupado = df.groupby(['pop', 'olt', 'slot', 'pon']).agg(
-    total=('cto', 'count')
-).reset_index()
-
-# Juntar os totais com o dataframe original
-df_final = pd.merge(df, agrupado, on=['pop', 'olt', 'slot', 'pon'])
-
-# Selecionar e reordenar colunas para exportação
-df_final = df_final[['pop', 'olt', 'slot', 'pon', 'cto', 'portas', 'total']]
-
-# Exportar para Excel
-df_final.to_excel("saida_formatada.xlsx", index=False)
+    # Reorganizar colunas
+    return df_total[['caminho_rede', 'portas_existentes', 'portas_novas', 'total_final', 'status']]
