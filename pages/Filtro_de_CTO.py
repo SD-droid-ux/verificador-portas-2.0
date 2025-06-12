@@ -34,18 +34,26 @@ input_ctos = st.text_area("Lista de CTOs")
 iniciar = st.button("Iniciar Análise")
 
 if input_ctos and iniciar:
-    # Lista das CTOs digitadas
     ctos_inputadas = [cto.strip().upper() for cto in input_ctos.split("\n") if cto.strip()]
-    # Verifica duplicatas na lista
-    duplicadas = set([cto for cto in ctos_inputadas if ctos_inputadas.count(cto) > 1])
-    if duplicadas:
-        st.warning(f"⚠️ CTOs duplicadas na entrada: {', '.join(duplicadas)}")
+    
+    # Verifica duplicadas na entrada
+    duplicadas_entrada = set([cto for cto in ctos_inputadas if ctos_inputadas.count(cto) > 1])
+    if duplicadas_entrada:
+        st.warning(f"⚠️ CTOs duplicadas na entrada: {', '.join(duplicadas_entrada)}")
 
+    # Filtra CTOs existentes na base
     df_filtrada = base_df[base_df["cto"].str.upper().isin(set(ctos_inputadas))].copy()
 
     if df_filtrada.empty:
         st.warning("Nenhuma CTO encontrada na base com os nomes fornecidos.")
     else:
+        # Verifica duplicadas na base
+        contagem_base = df_filtrada["cto"].str.upper().value_counts()
+        duplicadas_base = contagem_base[contagem_base > 1]
+        if not duplicadas_base.empty:
+            ctos_duplicadas_msg = "\n".join([f"- {cto}: {qtde} ocorrências" for cto, qtde in duplicadas_base.items()])
+            st.warning("⚠️ CTOs duplicadas na base de dados:\n" + ctos_duplicadas_msg)
+
         portas_existentes_dict = base_df.groupby("CAMINHO_REDE")["portas"].sum().to_dict()
         portas_acumuladas = {}
         resultados = []
@@ -72,21 +80,43 @@ if input_ctos and iniciar:
 
             resultados.append({
                 "CTO": cto_nome,
-                "ID_CTO": row.id_cto,
                 "STATUS": status,
                 "POP": row.pop,
                 "CHASSI": row.olt,
                 "PLACA": row.slot,
                 "OLT": row.pon,
-                "Latitude": row.latitude,
-                "Longitude": row.longitude,
-                "Portas_Existentes": portas_atual,
-                "Portas_Novas": portas_novas,
-                "Total_de_Portas": portas_acumuladas[caminho],
+                "ID_CTO": row.id_cto,
+                "LATITUDE": row.latitude,
+                "LONGITUDE": row.longitude,
+                "CTO_ATIVA": "SIM",
+                "PORTAS_EXISTENTES": portas_atual,
+                "PORTAS_NOVAS": portas_novas,
+                "TOTAL_DE_PORTAS": portas_acumuladas[caminho],
+                "TIPO_CTO": f"SP{row.portas}",
             })
 
             if i % 5 == 0 or i == total - 1:
                 progress.progress((i + 1) / total)
+
+        # CTOs não encontradas
+        ctos_nao_encontradas = set(ctos_inputadas) - set(df_filtrada["cto"].str.upper())
+        for cto_nao in ctos_nao_encontradas:
+            resultados.append({
+                "cto": cto_nao,
+                "id_cto": None,
+                "status": "❌ NÃO ENCONTRADA",
+                "cto_ativa": "NÃO",
+                "pop": None,
+                "olt": None,
+                "slot": None,
+                "pon": None,
+                "latitude": None,
+                "longitude": None,
+                "portas_existentes": None,
+                "portas_novas": None,
+                "total_de_portas": None,
+                "TIPO_CTO": None,
+            })
 
         df_resultado = pd.DataFrame(resultados)
 
