@@ -72,7 +72,7 @@ if input_ctos and iniciar:
 
             resultados.append({
                 "CTO": cto_nome,
-                "iID_CTO": row.id_cto,
+                "ID_CTO": row.id_cto,
                 "STATUS": status,
                 "POP": row.pop,
                 "CHASSI": row.olt,
