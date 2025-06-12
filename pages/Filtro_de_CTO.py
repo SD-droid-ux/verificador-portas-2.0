@@ -31,7 +31,7 @@ base_df["CAMINHO_REDE"] = (
 st.markdown("Insira a lista de CTOs que deseja analisar (uma por linha):")
 input_ctos = st.text_area("Lista de CTOs")
 
-iniciar = st.button("🚀 Iniciar Análise")
+iniciar = st.button("Iniciar Análise")
 
 if input_ctos and iniciar:
     # Lista das CTOs digitadas
