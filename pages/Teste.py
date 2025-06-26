@@ -94,7 +94,7 @@ if input_ctos and iniciar:
                 "ID_CTO": row.id_cto,
                 "LATITUDE": row.latitude,
                 "LONGITUDE": row.longitude,
-                "CTO_ATIVA": "SIM",
+                "CTO_ATIVA": row.status_cto,
                 "PORTAS_EXISTENTES": portas_atual,
                 "PORTAS_NOVAS": portas_novas,
                 "TOTAL_DE_PORTAS": portas_acumuladas[caminho],
